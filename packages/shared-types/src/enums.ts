@@ -1,0 +1,116 @@
+export enum MemberType {
+  PARTNER = 'PARTNER',
+  EMPLOYEE = 'EMPLOYEE',
+}
+
+export enum MemberStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  SUSPENDED = 'SUSPENDED',
+  INVITED = 'INVITED',
+}
+
+export enum ProjectStatus {
+  PLANNING = 'PLANNING',
+  ACTIVE = 'ACTIVE',
+  ON_HOLD = 'ON_HOLD',
+  UNDER_REVIEW = 'UNDER_REVIEW',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum TaskStatus {
+  BACKLOG = 'BACKLOG',
+  TODO = 'TODO',
+  IN_PROGRESS = 'IN_PROGRESS',
+  IN_REVIEW = 'IN_REVIEW',
+  BLOCKED = 'BLOCKED',
+  DONE = 'DONE',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum Priority {
+  LOW = 'LOW',
+  MEDIUM = 'MEDIUM',
+  HIGH = 'HIGH',
+  URGENT = 'URGENT',
+}
+
+export enum WorkCategory {
+  DEVELOPMENT = 'DEVELOPMENT',
+  DESIGN = 'DESIGN',
+  RESEARCH = 'RESEARCH',
+  MARKETING = 'MARKETING',
+  SALES = 'SALES',
+  MANAGEMENT = 'MANAGEMENT',
+  MEETING = 'MEETING',
+  SUPPORT = 'SUPPORT',
+  OTHER = 'OTHER',
+}
+
+export enum ApprovalStatus {
+  DRAFT = 'DRAFT',
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+}
+
+export enum TransactionType {
+  INCOME = 'INCOME',
+  EXPENSE = 'EXPENSE',
+  TRANSFER = 'TRANSFER',
+}
+
+export enum PaymentStatus {
+  UNPAID = 'UNPAID',
+  PARTIALLY_PAID = 'PARTIALLY_PAID',
+  PAID = 'PAID',
+  VOIDED = 'VOIDED',
+}
+
+export enum DecisionStatus {
+  DRAFT = 'DRAFT',
+  OPEN = 'OPEN',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum VoteType {
+  APPROVE = 'APPROVE',
+  REJECT = 'REJECT',
+  ABSTAIN = 'ABSTAIN',
+}
+
+export enum NotificationType {
+  TASK_ASSIGNED = 'TASK_ASSIGNED',
+  TASK_UPDATED = 'TASK_UPDATED',
+  TASK_REVIEW = 'TASK_REVIEW',
+  PROJECT_UPDATED = 'PROJECT_UPDATED',
+  EXPENSE_APPROVAL = 'EXPENSE_APPROVAL',
+  DECISION_CREATED = 'DECISION_CREATED',
+  DEADLINE_REMINDER = 'DEADLINE_REMINDER',
+  SYSTEM = 'SYSTEM',
+}
+
+export enum DailyReportStatus {
+  DRAFT = 'DRAFT',
+  SUBMITTED = 'SUBMITTED',
+  REVIEWED = 'REVIEWED',
+}
+
+export enum DealStage {
+  LEAD = 'LEAD',
+  QUALIFIED = 'QUALIFIED',
+  PROPOSAL = 'PROPOSAL',
+  NEGOTIATION = 'NEGOTIATION',
+  WON = 'WON',
+  LOST = 'LOST',
+}
+
+export enum AccountType {
+  CASH = 'CASH',
+  BANK = 'BANK',
+  WALLET = 'WALLET',
+  OTHER = 'OTHER',
+}

@@ -1,0 +1,792 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MemberType {
+  PARTNER
+  EMPLOYEE
+}
+
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  INVITED
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  UNDER_REVIEW
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskStatus {
+  BACKLOG
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  BLOCKED
+  DONE
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum WorkCategory {
+  DEVELOPMENT
+  DESIGN
+  RESEARCH
+  MARKETING
+  SALES
+  MANAGEMENT
+  MEETING
+  SUPPORT
+  OTHER
+}
+
+enum ApprovalStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  VOIDED
+}
+
+enum DecisionStatus {
+  DRAFT
+  OPEN
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum VoteType {
+  APPROVE
+  REJECT
+  ABSTAIN
+}
+
+enum NotificationType {
+  TASK_ASSIGNED
+  TASK_UPDATED
+  TASK_REVIEW
+  PROJECT_UPDATED
+  EXPENSE_APPROVAL
+  DECISION_CREATED
+  DEADLINE_REMINDER
+  SYSTEM
+}
+
+enum DailyReportStatus {
+  DRAFT
+  SUBMITTED
+  REVIEWED
+}
+
+enum DealStage {
+  LEAD
+  QUALIFIED
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum AccountType {
+  CASH
+  BANK
+  WALLET
+  OTHER
+}
+
+model Organization {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String   @unique
+  logoUrl     String?
+  currency    String   @default("EGP")
+  timezone    String   @default("Africa/Cairo")
+  defaultLang String   @default("en")
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members       OrganizationMember[]
+  businessUnits BusinessUnit[]
+  departments   Department[]
+  projects      Project[]
+  tasks         Task[]
+  workLogs      WorkLog[]
+  dailyReports  DailyReport[]
+  accounts      FinancialAccount[]
+  categories    FinancialCategory[]
+  transactions  Transaction[]
+  clients       Client[]
+  meetings      Meeting[]
+  decisions     Decision[]
+  notifications Notification[]
+  roles         Role[]
+  auditLogs     AuditLog[]
+  files         StoredFile[]
+  invitations   Invitation[]
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  fullName     String
+  email        String   @unique
+  passwordHash String?
+  avatarUrl    String?
+  phone        String?
+  locale       String   @default("en")
+  isActive     Boolean  @default(true)
+  lastLoginAt  DateTime?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships         OrganizationMember[]
+  createdTasks        Task[]                @relation("TaskCreator")
+  assignedTasks       Task[]                @relation("TaskAssignee")
+  reviewedTasks       Task[]                @relation("TaskReviewer")
+  workLogs            WorkLog[]
+  dailyReports        DailyReport[]
+  createdTransactions Transaction[]         @relation("TransactionCreator")
+  createdDecisions    Decision[]            @relation("DecisionCreator")
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+  uploadedFiles       StoredFile[]
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  tokenHash String   @unique
+  expiresAt DateTime
+  isRevoked Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRevoked])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Invitation {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  email          String
+  roleId         String?      @db.Uuid
+  tokenHash      String       @unique
+  memberType     MemberType   @default(EMPLOYEE)
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdAt      DateTime     @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, email])
+}
+
+model OrganizationMember {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  userId         String       @db.Uuid
+  memberType     MemberType
+  status         MemberStatus @default(ACTIVE)
+  joinedAt       DateTime     @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  partner               Partner?
+  departmentMemberships DepartmentMember[]
+  businessMemberships   BusinessUnitMember[]
+  projectMemberships    ProjectMember[]
+  roles                 UserRole[]
+
+  @@unique([organizationId, userId])
+  @@index([organizationId, memberType, status])
+}
+
+model Partner {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @db.Uuid
+  memberId       String  @unique @db.Uuid
+  ownership      Decimal @default(25) @db.Decimal(5, 2)
+  title          String?
+
+  member   OrganizationMember    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  votes    DecisionVote[]
+  approvals TransactionApproval[]
+
+  @@index([organizationId])
+}
+
+model Role {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @db.Uuid
+  name           String
+  description    String?
+  isSystem       Boolean @default(false)
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  permissions  RolePermission[]
+  assignments  UserRole[]
+
+  @@unique([organizationId, name])
+}
+
+model Permission {
+  id          String  @id @default(uuid()) @db.Uuid
+  key         String  @unique
+  module      String
+  description String?
+
+  roles RolePermission[]
+}
+
+model RolePermission {
+  roleId       String @db.Uuid
+  permissionId String @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model UserRole {
+  id             String  @id @default(uuid()) @db.Uuid
+  memberId       String  @db.Uuid
+  roleId         String  @db.Uuid
+  businessUnitId String? @db.Uuid
+  departmentId   String? @db.Uuid
+
+  member OrganizationMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  role   Role               @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, roleId, businessUnitId, departmentId])
+  @@index([memberId])
+}
+
+model BusinessUnit {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @db.Uuid
+  name           String
+  code           String
+  description    String?
+  managerId      String? @db.Uuid
+  isActive       Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  projects     Project[]
+  members      BusinessUnitMember[]
+  transactions Transaction[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+}
+
+model BusinessUnitMember {
+  id             String  @id @default(uuid()) @db.Uuid
+  businessUnitId String  @db.Uuid
+  memberId       String  @db.Uuid
+  role           String?
+
+  businessUnit BusinessUnit       @relation(fields: [businessUnitId], references: [id], onDelete: Cascade)
+  member       OrganizationMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([businessUnitId, memberId])
+}
+
+model Department {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizationId String  @db.Uuid
+  name           String
+  code           String
+  description    String?
+  managerId      String? @db.Uuid
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members      DepartmentMember[]
+
+  @@unique([organizationId, code])
+}
+
+model DepartmentMember {
+  id           String @id @default(uuid()) @db.Uuid
+  departmentId String @db.Uuid
+  memberId     String @db.Uuid
+
+  department Department         @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  member     OrganizationMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([departmentId, memberId])
+}
+
+model Project {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @db.Uuid
+  businessUnitId String        @db.Uuid
+  clientId       String?       @db.Uuid
+  name           String
+  code           String
+  description    String?
+  managerId      String?       @db.Uuid
+  budget         Decimal?      @db.Decimal(18, 2)
+  currency       String        @default("EGP")
+  status         ProjectStatus @default(PLANNING)
+  priority       Priority      @default(MEDIUM)
+  startDate      DateTime?
+  dueDate        DateTime?
+  completedAt    DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  businessUnit BusinessUnit @relation(fields: [businessUnitId], references: [id], onDelete: Cascade)
+  client       Client?      @relation(fields: [clientId], references: [id])
+
+  members      ProjectMember[]
+  tasks        Task[]
+  milestones   Milestone[]
+  workLogs     WorkLog[]
+  transactions Transaction[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, status])
+  @@index([businessUnitId])
+  @@index([managerId])
+}
+
+model ProjectMember {
+  id        String  @id @default(uuid()) @db.Uuid
+  projectId String  @db.Uuid
+  memberId  String  @db.Uuid
+  role      String?
+
+  project Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  member  OrganizationMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, memberId])
+}
+
+model Task {
+  id             String     @id @default(uuid()) @db.Uuid
+  organizationId String     @db.Uuid
+  projectId      String     @db.Uuid
+  parentTaskId   String?    @db.Uuid
+  title          String
+  description    String?
+  assignedToId   String?    @db.Uuid
+  createdById    String     @db.Uuid
+  reviewerId     String?    @db.Uuid
+  status         TaskStatus @default(TODO)
+  priority       Priority   @default(MEDIUM)
+  estimatedHours Decimal?   @db.Decimal(8, 2)
+  dueDate        DateTime?
+  completedAt    DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent       Task?        @relation("TaskHierarchy", fields: [parentTaskId], references: [id])
+  children     Task[]       @relation("TaskHierarchy")
+
+  assignedTo User? @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  createdBy  User  @relation("TaskCreator", fields: [createdById], references: [id])
+  reviewer   User? @relation("TaskReviewer", fields: [reviewerId], references: [id])
+
+  comments    TaskComment[]
+  workLogs    WorkLog[]
+  history     TaskStatusHistory[]
+  attachments TaskAttachment[]
+
+  @@index([organizationId, status])
+  @@index([projectId])
+  @@index([assignedToId, status])
+  @@index([dueDate])
+}
+
+model TaskAttachment {
+  id        String   @id @default(uuid()) @db.Uuid
+  taskId    String   @db.Uuid
+  fileId    String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  task Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  file StoredFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+}
+
+model TaskComment {
+  id        String   @id @default(uuid()) @db.Uuid
+  taskId    String   @db.Uuid
+  userId    String   @db.Uuid
+  content   String
+  createdAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+model TaskStatusHistory {
+  id          String      @id @default(uuid()) @db.Uuid
+  taskId      String      @db.Uuid
+  changedById String      @db.Uuid
+  oldStatus   TaskStatus?
+  newStatus   TaskStatus
+  createdAt   DateTime    @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, createdAt])
+}
+
+model WorkLog {
+  id              String         @id @default(uuid()) @db.Uuid
+  organizationId  String         @db.Uuid
+  userId          String         @db.Uuid
+  projectId       String?        @db.Uuid
+  taskId          String?        @db.Uuid
+  workDate        DateTime
+  durationMinutes Int
+  description     String
+  category        WorkCategory
+  approvalStatus  ApprovalStatus @default(DRAFT)
+  approvedById    String?        @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project      Project?     @relation(fields: [projectId], references: [id])
+  task         Task?        @relation(fields: [taskId], references: [id])
+
+  @@index([organizationId, workDate])
+  @@index([userId, workDate])
+}
+
+model DailyReport {
+  id              String            @id @default(uuid()) @db.Uuid
+  organizationId  String            @db.Uuid
+  userId          String            @db.Uuid
+  reportDate      DateTime
+  accomplishments String
+  nextSteps       String?
+  blockers        String?
+  status          DailyReportStatus @default(DRAFT)
+  submittedAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId, reportDate])
+}
+
+model Milestone {
+  id          String    @id @default(uuid()) @db.Uuid
+  projectId   String    @db.Uuid
+  title       String
+  description String?
+  dueDate     DateTime?
+  status      String    @default("PENDING")
+  completedAt DateTime?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model FinancialAccount {
+  id             String      @id @default(uuid()) @db.Uuid
+  organizationId String      @db.Uuid
+  name           String
+  accountType    AccountType
+  currency       String      @default("EGP")
+  openingBalance Decimal     @default(0) @db.Decimal(18, 2)
+  isActive       Boolean     @default(true)
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@index([organizationId])
+}
+
+model FinancialCategory {
+  id              String          @id @default(uuid()) @db.Uuid
+  organizationId  String          @db.Uuid
+  name            String
+  transactionType TransactionType
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@unique([organizationId, name, transactionType])
+}
+
+model Transaction {
+  id              String          @id @default(uuid()) @db.Uuid
+  organizationId  String          @db.Uuid
+  accountId       String          @db.Uuid
+  businessUnitId  String?         @db.Uuid
+  projectId       String?         @db.Uuid
+  categoryId      String          @db.Uuid
+  createdById     String          @db.Uuid
+  type            TransactionType
+  amount          Decimal         @db.Decimal(18, 2)
+  currency        String          @default("EGP")
+  description     String
+  transactionDate DateTime
+  paymentStatus   PaymentStatus   @default(UNPAID)
+  approvalStatus  ApprovalStatus  @default(DRAFT)
+  submittedAt     DateTime?
+  approvedAt      DateTime?
+  paidAt          DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  account      FinancialAccount      @relation(fields: [accountId], references: [id])
+  businessUnit BusinessUnit?         @relation(fields: [businessUnitId], references: [id])
+  project      Project?              @relation(fields: [projectId], references: [id])
+  category     FinancialCategory     @relation(fields: [categoryId], references: [id])
+  createdBy    User                  @relation("TransactionCreator", fields: [createdById], references: [id])
+
+  approvals   TransactionApproval[]
+  attachments TransactionAttachment[]
+
+  @@index([organizationId, transactionDate])
+  @@index([organizationId, approvalStatus])
+  @@index([accountId])
+}
+
+model TransactionAttachment {
+  id            String   @id @default(uuid()) @db.Uuid
+  transactionId String   @db.Uuid
+  fileId        String   @db.Uuid
+  createdAt     DateTime @default(now())
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  file        StoredFile  @relation(fields: [fileId], references: [id], onDelete: Cascade)
+}
+
+model TransactionApproval {
+  id            String    @id @default(uuid()) @db.Uuid
+  transactionId String    @db.Uuid
+  partnerId     String    @db.Uuid
+  decision      VoteType
+  comments      String?
+  decidedAt     DateTime  @default(now())
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  partner     Partner     @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@unique([transactionId, partnerId])
+}
+
+model Client {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  name           String
+  companyName    String?
+  email          String?
+  phone          String?
+  address        String?
+  source         String?
+  status         String   @default("ACTIVE")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  projects     Project[]
+  deals        Deal[]
+
+  @@index([organizationId, name])
+}
+
+model Deal {
+  id                String    @id @default(uuid()) @db.Uuid
+  clientId          String    @db.Uuid
+  businessUnitId    String    @db.Uuid
+  title             String
+  estimatedValue    Decimal?  @db.Decimal(18, 2)
+  currency          String    @default("EGP")
+  stage             DealStage @default(LEAD)
+  ownerId           String?   @db.Uuid
+  expectedCloseDate DateTime?
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  @@index([businessUnitId, stage])
+}
+
+model Meeting {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  title          String
+  description    String?
+  meetingDate    DateTime
+  organizerId    String   @db.Uuid
+  status         String   @default("SCHEDULED")
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  participants MeetingParticipant[]
+  notes        MeetingNote[]
+}
+
+model MeetingParticipant {
+  id        String @id @default(uuid()) @db.Uuid
+  meetingId String @db.Uuid
+  userId    String @db.Uuid
+  status    String @default("INVITED")
+
+  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@unique([meetingId, userId])
+}
+
+model MeetingNote {
+  id        String   @id @default(uuid()) @db.Uuid
+  meetingId String   @db.Uuid
+  content   String
+  createdBy String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+}
+
+model Decision {
+  id             String         @id @default(uuid()) @db.Uuid
+  organizationId String         @db.Uuid
+  title          String
+  description    String
+  proposedById   String         @db.Uuid
+  status         DecisionStatus @default(DRAFT)
+  votingDeadline DateTime?
+  result         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  proposedBy   User           @relation("DecisionCreator", fields: [proposedById], references: [id])
+  votes        DecisionVote[]
+}
+
+model DecisionVote {
+  id         String   @id @default(uuid()) @db.Uuid
+  decisionId String   @db.Uuid
+  partnerId  String   @db.Uuid
+  vote       VoteType
+  comments   String?
+  votedAt    DateTime @default(now())
+
+  decision Decision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+  partner  Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@unique([decisionId, partnerId])
+}
+
+model Notification {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @db.Uuid
+  userId         String           @db.Uuid
+  title          String
+  body           String
+  type           NotificationType
+  referenceType  String?
+  referenceId    String?
+  readAt         DateTime?
+
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+}
+
+model StoredFile {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  uploadedById   String   @db.Uuid
+  storageKey     String   @unique
+  originalName   String
+  mimeType       String
+  size           BigInt
+
+  createdAt DateTime @default(now())
+
+  organization          Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  uploadedBy            User                    @relation(fields: [uploadedById], references: [id])
+  taskAttachments       TaskAttachment[]
+  transactionAttachments TransactionAttachment[]
+}
+
+model AuditLog {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  actorId        String?  @db.Uuid
+  action         String
+  entityType     String
+  entityId       String?
+  oldValues      Json?
+  newValues      Json?
+  ipAddress      String?
+
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor        User?        @relation(fields: [actorId], references: [id])
+
+  @@index([organizationId, createdAt])
+  @@index([entityType, entityId])
+}

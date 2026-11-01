@@ -1,0 +1,20 @@
+{
+  "name": "fekra-ai-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FEKRA AI - Company Operating System Monorepo",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm --prefix apps/web run dev",
+    "dev:api": "npm --prefix apps/api run start:dev",
+    "build:web": "npm --prefix apps/web run build",
+    "build:api": "npm --prefix apps/api run build"
+  },
+  "devDependencies": {
+    "prettier": "^3.2.5",
+    "typescript": "^5.4.5"
+  }
+}
