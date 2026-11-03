@@ -25,9 +25,10 @@ COPY apps/api apps/api
 WORKDIR /app/apps/api
 
 # Generate Prisma client & compile TypeScript
-RUN npx prisma generate && npm run build
+RUN npx prisma generate && npm run build && \
+    ( [ -f dist/apps/api/src/main.js ] && printf 'require("./apps/api/src/main.js");\n' > dist/main.js || true )
 
 EXPOSE 4000
 
 # Start sequence: sync schema (db push) → seed (idempotent) → run API
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && npx ts-node prisma/seed.ts && node dist/main"]
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && npx ts-node prisma/seed.ts && ([ -f dist/apps/api/src/main.js ] && node dist/apps/api/src/main.js || node dist/main.js)"]
