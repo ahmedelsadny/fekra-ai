@@ -11,8 +11,16 @@ export class AuthService {
   ) {}
 
   async login(email: string, pass: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { email },
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanPass = (pass || '').trim();
+
+    const user = await this.prisma.user.findFirst({
+      where: {
+        email: {
+          equals: cleanEmail,
+          mode: 'insensitive',
+        },
+      },
       include: {
         memberships: {
           include: {
@@ -28,7 +36,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    const isMatch = await argon2.verify(user.passwordHash, pass);
+    const isMatch =
+      (await argon2.verify(user.passwordHash, pass)) ||
+      (await argon2.verify(user.passwordHash, cleanPass));
+
     if (!isMatch) {
       throw new UnauthorizedException('Invalid email or password');
     }

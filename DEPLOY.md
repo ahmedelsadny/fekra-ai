@@ -165,16 +165,28 @@ docker exec fekra-postgres pg_dump -U fekra_user fekra_ai > fekra-backup-$(date 
 cat fekra-backup-YYYY-MM-DD.sql | docker exec -i fekra-postgres psql -U fekra_user fekra_ai
 ```
 
-### 🔄 تحديث النظام بعد تعديلات جديدة
+### 🔄 تحديث النظام بعد تعديلات مكالمات الفيديو و HTTPS
+
+على السيرفر، نفذ الأوامر التالية:
 
 ```bash
 cd /root/fekra-ai
-git pull   # لو شغال بـ GitHub
+git pull origin main
+
+# 1. إعداد شهادة الأمان HTTPS (أمر واحد تلقائي):
+chmod +x setup-ssl.sh
+bash setup-ssl.sh
+# لو عندك دومين خاص: bash setup-ssl.sh yourdomain.com
+
+# 2. بناء وتشغيل الخدمات المحدثة:
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-### 🌐 ربط دومين (اختياري)
-لو عندك دومين، وجّه DNS بتاعه لعنوان السيرفر، وبعدين استخدم Nginx + Let's Encrypt (أو Cloudflare) عشان تفتح الموقع على بورت 443 بدل 3000.
+الموقع متاح الآن مشفراً على:
+```
+https://95.179.160.169
+```
+أو على الدومين الخاص بك مباشرة، ومكالمات الفيديو تعمل فوراً بكاميرا وميكروفون ومشاركة شاشة!
 
 ---
 

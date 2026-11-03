@@ -47,22 +47,6 @@ npm run dev           # runs Web (3000) + API (4000) together
 
 ---
 
-## 🏛️ Seeded Founding Partners (25% Each)
-
-| Partner | Title | Initial Ownership | Voting Power |
-|---|---|---|---|
-| **Mahmoud Ashraf** | Managing Partner & Strategy | 25.00% | 1 Vote (Equal) |
-| **Ahmed Elsadny** | Technical Partner & Technology | 25.00% | 1 Vote (Equal) |
-| **Ahmed Fouda** | Commercial & Financial Partner | 25.00% | 1 Vote (Equal) |
-| **Mohamed Monem** | Operations & Execution Partner | 25.00% | 1 Vote (Equal) |
-
-| Email | Initial Password |
-|---|---|
-| `Mahmoud@fekra.com` | `20101510` |
-| `Elsadny@fekra.com` | `ahmed01285217746` |
-| `Fouda@fekra.com` | `fouda11111fekra` |
-| `Monem@fekra.com` | `monem1214##fekra` |
-
 > ⚠️ These are INITIAL passwords — change them right after the first deployment (see DEPLOY.md §7).
 
 ---

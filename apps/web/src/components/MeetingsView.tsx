@@ -20,6 +20,7 @@ import {
   Sparkles,
   ChevronLeft,
 } from 'lucide-react';
+import { VideoCallModal } from './VideoCallModal';
 
 /* ============================================================
    Types
@@ -297,8 +298,7 @@ export const MeetingsView: React.FC = () => {
         <div className="p-2.5 rounded-xl bg-surface-card border border-surface-border text-[10px] text-slate-500 flex items-start gap-2">
           <ShieldCheck className="w-3.5 h-3.5 text-cyan shrink-0 mt-0.5" />
           <span>
-            المكالمات عبر خدمة Jitsi — أي شريك يفتح نفس الغرفة من جهازه بيدخل الميتنج أوتوماتيكياً
-            (كاميرا + مشاركة شاشة + صوت).
+            نظام مكالمات الفيديو مستقل 100% ومشفر (WebRTC P2P) — كاميرا وميكروفون ومشاركة شاشة بدون أي طرف ثالث أو تسجيل دخول إضافي.
           </span>
         </div>
       </div>
@@ -449,50 +449,15 @@ export const MeetingsView: React.FC = () => {
         </div>
       </div>
 
-      {/* ================= Call Modal (Jitsi) ================= */}
+      {/* ================= Call Modal (Self-Hosted WebRTC) ================= */}
       {callRoom && (
-        <div className="fixed inset-0 z-50 bg-[#0B2447]/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="glass-panel rounded-3xl w-full max-w-6xl h-[88vh] p-4 flex flex-col animate-scaleIn">
-            {/* Call header */}
-            <div className="flex items-center justify-between gap-3 pb-3 border-b border-surface-border">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan to-electric-600 text-white flex items-center justify-center">
-                  <Phone className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">مكالمة: {callRoom.title}</h3>
-                  <p className="text-[10px] text-slate-500 font-mono" dir="ltr">
-                    Room: {callRoom.slug}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setCallRoom(null)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-500/10 text-rose-600 border border-rose-500/30 hover:bg-rose-500/20 text-xs font-bold transition"
-              >
-                <VideoOff className="w-4 h-4" />
-                <span>إنهاء / مغادرة المكالمة</span>
-              </button>
-            </div>
-
-            {/* Jitsi meeting embed — camera, mic & screen share */}
-            <div className="flex-1 mt-3 rounded-2xl overflow-hidden border border-surface-border bg-slate-100">
-              <iframe
-                title="Fekra Partners Meeting"
-                src={`https://meet.jit.si/${callRoom.slug}?config.prejoinConfig.enabled=true&config.startWithVideoMuted=false&config.startWithScreenShare=false`}
-                allow="camera; microphone; display-capture; autoplay; clipboard-write; fullscreen"
-                className="w-full h-full border-0"
-              />
-            </div>
-
-            <p className="pt-3 text-[10px] text-slate-500 flex items-center gap-2">
-              <ShieldCheck className="w-3.5 h-3.5 text-cyan shrink-0" />
-              {callRoom.type === 'GROUP'
-                ? 'الغرفة الجماعية دييمة — أي شريك يدخل صفحة الاجتماعات ويضغط زرار المكالمة بيدخل معاك فوراً. جواه هتلاقي أزرار: تشغيل الكاميرا 🎥، مشاركة الشاشة 🖥️، وكتم/تشغيل الصوت.'
-                : 'ابعت اسم الغرفة للشريك أو خليه يفتح نفس المحادثة ويضغط زرار المكالمة — هيدخل معاك فوراً في نفس الميتنج (كاميرا + مشاركة شاشة + صوت).'}
-            </p>
-          </div>
-        </div>
+        <VideoCallModal
+          roomSlug={callRoom.slug}
+          roomTitle={callRoom.title}
+          roomType={callRoom.type}
+          currentUserName={user?.fullName || 'أنت'}
+          onClose={() => setCallRoom(null)}
+        />
       )}
     </div>
   );

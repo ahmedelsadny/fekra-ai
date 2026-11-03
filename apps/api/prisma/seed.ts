@@ -28,7 +28,7 @@ async function main() {
   const partnersData = [
     {
       fullName: 'Mahmoud Ashraf',
-      email: 'Mahmoud@fekra.com',
+      email: 'mahmoud@fekra.com',
       passwordPlain: '20101510',
       title: 'Managing Partner & Strategy',
       ownership: 25.0,
@@ -36,7 +36,7 @@ async function main() {
     },
     {
       fullName: 'Ahmed Elsadny',
-      email: 'Elsadny@fekra.com',
+      email: 'elsadny@fekra.com',
       passwordPlain: 'ahmed01285217746',
       title: 'Technical Partner & Technology',
       ownership: 25.0,
@@ -44,7 +44,7 @@ async function main() {
     },
     {
       fullName: 'Ahmed Fouda',
-      email: 'Fouda@fekra.com',
+      email: 'fouda@fekra.com',
       passwordPlain: 'fouda11111fekra',
       title: 'Commercial & Financial Partner',
       ownership: 25.0,
@@ -52,7 +52,7 @@ async function main() {
     },
     {
       fullName: 'Mohamed Monem',
-      email: 'Monem@fekra.com',
+      email: 'monem@fekra.com',
       passwordPlain: 'monem1214##fekra',
       title: 'Operations & Execution Partner',
       ownership: 25.0,
@@ -64,18 +64,32 @@ async function main() {
 
   for (const p of partnersData) {
     const passwordHash = await argon2.hash(p.passwordPlain);
-    const user = await prisma.user.upsert({
-      where: { email: p.email },
-      update: {},
-      create: {
-        fullName: p.fullName,
-        email: p.email,
-        passwordHash,
-        phone: p.phone,
-        locale: 'ar',
-        isActive: true,
-      },
+
+    const existingUser = await prisma.user.findFirst({
+      where: { email: { equals: p.email, mode: 'insensitive' } },
     });
+
+    let user;
+    if (existingUser) {
+      user = await prisma.user.update({
+        where: { id: existingUser.id },
+        data: {
+          email: p.email.toLowerCase(),
+          passwordHash,
+        },
+      });
+    } else {
+      user = await prisma.user.create({
+        data: {
+          fullName: p.fullName,
+          email: p.email.toLowerCase(),
+          passwordHash,
+          phone: p.phone,
+          locale: 'ar',
+          isActive: true,
+        },
+      });
+    }
 
     const member = await prisma.organizationMember.upsert({
       where: {

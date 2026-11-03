@@ -17,7 +17,12 @@ export function getBaseUrl(): string {
     return process.env.NEXT_PUBLIC_API_URL;
   }
   if (typeof window !== 'undefined') {
-    return `http://${window.location.hostname}:4000/api/v1`;
+    // If accessing directly via dev/custom port 3000:
+    if (window.location.port === '3000') {
+      return `${window.location.protocol}//${window.location.hostname}:4000/api/v1`;
+    }
+    // Behind reverse proxy (Nginx HTTPS port 443 or port 80):
+    return `${window.location.origin}/api/v1`;
   }
   return 'http://localhost:4000/api/v1';
 }

@@ -13,7 +13,7 @@ git add .
 
 echo.
 echo [2/4] إنشاء Commit...
-git commit -m "Deploy-ready FEKRA AI platform for Ubuntu 22.04"
+git commit -m "Add self-hosted WebRTC video calling, Nginx HTTPS reverse proxy, and SSL setup"
 
 echo.
 echo [3/4] التأكد من الفرع الرئيسي main...

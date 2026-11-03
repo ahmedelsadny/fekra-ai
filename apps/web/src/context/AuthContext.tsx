@@ -20,7 +20,7 @@ export interface PartnerUser {
 export const AUTHORIZED_PARTNERS: PartnerUser[] = [
   {
     id: 'p1',
-    email: 'Mahmoud@fekra.com',
+    email: 'mahmoud@fekra.com',
     name: 'Mahmoud Ashraf',
     role: 'Managing Partner & Strategy',
     initials: 'MA',
@@ -28,7 +28,7 @@ export const AUTHORIZED_PARTNERS: PartnerUser[] = [
   },
   {
     id: 'p2',
-    email: 'Elsadny@fekra.com',
+    email: 'elsadny@fekra.com',
     name: 'Ahmed Elsadny',
     role: 'Technical Partner & Technology',
     initials: 'AE',
@@ -36,7 +36,7 @@ export const AUTHORIZED_PARTNERS: PartnerUser[] = [
   },
   {
     id: 'p3',
-    email: 'Fouda@fekra.com',
+    email: 'fouda@fekra.com',
     name: 'Ahmed Fouda',
     role: 'Commercial & Financial Partner',
     initials: 'AF',
@@ -44,7 +44,7 @@ export const AUTHORIZED_PARTNERS: PartnerUser[] = [
   },
   {
     id: 'p4',
-    email: 'Monem@fekra.com',
+    email: 'monem@fekra.com',
     name: 'Mohamed Monem',
     role: 'Operations & Execution Partner',
     initials: 'MM',

@@ -55,8 +55,125 @@ export class ChatGateway {
     }
   }
 
-  async handleDisconnect() {
-    // socket.io handles room cleanup automatically
+  async handleDisconnect(client: Socket) {
+    const user = client.data?.user as SocketUser | undefined;
+    if (!user) return;
+    const rooms = client.rooms ? [...client.rooms] : [];
+    for (const room of rooms) {
+      if (room.startsWith('call:')) {
+        client.to(room).emit('call:peer-left', {
+          peerId: client.id,
+          userId: user.id,
+        });
+      }
+    }
+  }
+
+  // ============================================================
+  // WebRTC Video Calling Signaling Events
+  // ============================================================
+
+  @SubscribeMessage('call:join')
+  async onCallJoin(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { roomSlug: string },
+  ) {
+    const user = client.data?.user as SocketUser | undefined;
+    if (!user?.orgId || !body?.roomSlug) return;
+    const roomKey = `call:${user.orgId}:${body.roomSlug}`;
+    client.join(roomKey);
+
+    // Notify all existing peers in this room that a new peer joined
+    client.to(roomKey).emit('call:peer-joined', {
+      peerId: client.id,
+      userId: user.id,
+      fullName: user.fullName,
+    });
+
+    // Provide the list of existing peers to the newly joined peer
+    const room = this.server.sockets.adapter.rooms.get(roomKey);
+    const existingPeers: Array<{ peerId: string; userId?: string; fullName?: string }> = [];
+    if (room) {
+      for (const socketId of room) {
+        if (socketId !== client.id) {
+          const peerSocket = this.server.sockets.sockets.get(socketId);
+          const peerUser = peerSocket?.data?.user as SocketUser | undefined;
+          existingPeers.push({
+            peerId: socketId,
+            userId: peerUser?.id,
+            fullName: peerUser?.fullName,
+          });
+        }
+      }
+    }
+    client.emit('call:existing-peers', { peers: existingPeers });
+  }
+
+  @SubscribeMessage('call:offer')
+  async onCallOffer(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    body: {
+      targetSocketId: string;
+      offer: any;
+      roomSlug: string;
+    },
+  ) {
+    const user = client.data?.user as SocketUser | undefined;
+    if (!user || !body?.targetSocketId) return;
+    this.server.to(body.targetSocketId).emit('call:offer', {
+      offer: body.offer,
+      fromSocketId: client.id,
+      fromUserId: user.id,
+      fromName: user.fullName,
+    });
+  }
+
+  @SubscribeMessage('call:answer')
+  async onCallAnswer(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    body: {
+      targetSocketId: string;
+      answer: any;
+    },
+  ) {
+    if (!body?.targetSocketId) return;
+    this.server.to(body.targetSocketId).emit('call:answer', {
+      answer: body.answer,
+      fromSocketId: client.id,
+    });
+  }
+
+  @SubscribeMessage('call:ice-candidate')
+  async onIceCandidate(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    body: {
+      targetSocketId: string;
+      candidate: any;
+    },
+  ) {
+    if (!body?.targetSocketId) return;
+    this.server.to(body.targetSocketId).emit('call:ice-candidate', {
+      candidate: body.candidate,
+      fromSocketId: client.id,
+    });
+  }
+
+  @SubscribeMessage('call:leave')
+  async onCallLeave(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { roomSlug: string },
+  ) {
+    const user = client.data?.user as SocketUser | undefined;
+    if (!user?.orgId || !body?.roomSlug) return;
+    const roomKey = `call:${user.orgId}:${body.roomSlug}`;
+    client.to(roomKey).emit('call:peer-left', {
+      peerId: client.id,
+      userId: user.id,
+    });
+    client.leave(roomKey);
   }
 
   @SubscribeMessage('chat:join')

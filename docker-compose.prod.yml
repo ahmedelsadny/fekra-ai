@@ -3,9 +3,7 @@
 #
 #   docker compose -f docker-compose.prod.yml up -d --build
 #
-# Starts: PostgreSQL 16 + NestJS API + Next.js Web
-# No .env file required — sane defaults are provided below.
-# Change the secrets before real production use.
+# Starts: PostgreSQL 16 + NestJS API + Next.js Web + Nginx (HTTPS)
 # ============================================================
 
 services:
@@ -55,10 +53,24 @@ services:
     depends_on:
       - api
     environment:
-      # Leave empty to auto-resolve http://<server-host>:4000/api/v1 at runtime
+      # Auto-resolves at runtime via window.location (Nginx HTTPS or direct port 3000)
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
     ports:
       - '3000:3000'
+
+  nginx:
+    image: nginx:alpine
+    container_name: fekra-nginx
+    restart: unless-stopped
+    depends_on:
+      - web
+      - api
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
 
 volumes:
   postgres_data:
