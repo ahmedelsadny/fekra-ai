@@ -1,0 +1,66 @@
+# ============================================================
+# FEKRA AI — Production Deployment (single command)
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Starts: PostgreSQL 16 + NestJS API + Next.js Web
+# No .env file required — sane defaults are provided below.
+# Change the secrets before real production use.
+# ============================================================
+
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fekra-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fekra_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-fekra_secure_password}
+      POSTGRES_DB: fekra_ai
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U fekra_user -d fekra_ai']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: fekra-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://fekra_user:${DB_PASSWORD:-fekra_secure_password}@postgres:5432/fekra_ai?schema=public
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-fekra-ai-super-secret-access-token-key-change-in-prod-2026}
+      ACCESS_TOKEN_TTL: ${ACCESS_TOKEN_TTL:-7d}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+    ports:
+      - '4000:4000'
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: fekra-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      # Leave empty to auto-resolve http://<server-host>:4000/api/v1 at runtime
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+    ports:
+      - '3000:3000'
+
+volumes:
+  postgres_data:

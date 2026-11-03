@@ -6,95 +6,64 @@ Fekra AI is an internal enterprise operating platform engineered to manage the c
 - **Four Equal Founding Partners:** 25% ownership each with equal voting rights.
 - **Unanimous Expense Approval:** 4 out of 4 partner approvals are mandatory to approve company expenses.
 - **Multiple Business Units & Departments:** Structured organizational isolation.
-- **Projects & Kanban:** Multi-stage task lifecycle with review gates.
-- **Daily Reports & Work Logs:** Transparent productivity and blocker tracking.
+- **Projects & Tasks:** Per-project chat, tasks with review gates, and project profitability tracking.
+- **Meetings & Calls:** Private 1-on-1 chats + a permanent partners group room with real-time video calls (camera, mic & screen-share).
+- **Real-time Everything:** Socket.IO — messages, chat rooms and notifications reach every partner's device instantly.
+- **Audit Trail:** Every financial / project / task action is permanently recorded (who did what & when).
 - **Bilingual Interface:** Full native Arabic (RTL) and English (LTR) support.
-- **Design System:** Sleek Dark Navy theme (`#060B18`) with Electric Blue / Cyan accents (`#00F0FF`).
+- **Design System:** Light "White + Sky Blue" premium theme with `#1E7CF7` accents.
+- **Zero Mock Data:** The system starts completely EMPTY — balances at 0, no fake transactions, projects or reports.
 
 ---
 
-## 🏗️ Repository Architecture (pnpm Monorepo)
+## 🚀 Deployment (Server)
 
-```text
-سيستم متابعه شغل/
-│
-├── apps/
-│   ├── web/                     # Next.js 14 App Router, Tailwind CSS, Arabic RTL/English LTR
-│   │   ├── src/app/             # Layout & Dashboard page
-│   │   ├── src/components/      # 4-Partner Approval Widget, Kanban, Daily Reports, Topbar, Sidebar
-│   │   ├── src/context/         # LanguageContext (Arabic/English switcher)
-│   │   └── src/translations/    # Bilingual dictionary
-│   │
-│   └── api/                     # NestJS 10 Modular API
-│       ├── prisma/              # schema.prisma & seed.ts (4 Partners, Org, BU, Accounts)
-│       └── src/
-│           ├── common/          # Global interceptors, filters, guards
-│           ├── database/        # PrismaService & PrismaModule
-│           └── modules/         # Auth, Partners, Finance (Unanimous Approval Engine)
-│
-├── packages/
-│   └── shared-types/            # Enums, DTO contracts & 4-Partner governance evaluation functions
-│
-├── docs/
-│   └── TECHNICAL_SPECIFICATION.md  # Approved v1.0.0 Specification
-│
-├── docker-compose.yml           # PostgreSQL 16, Redis 7, MinIO S3
-├── pnpm-workspace.yaml          # Monorepo workspaces definition
-├── package.json                 # Monorepo scripts
-└── README.md
+The full step-by-step server guide lives in **[DEPLOY.md](./DEPLOY.md)** — one command brings up PostgreSQL + API + Web:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
 ```
+
+- **Web Platform:** `http://<server>:3000`
+- **API Backend:** `http://<server>:4000/api/v1`
+- **API Swagger Docs:** `http://<server>:4000/docs`
+- **Real-time (Socket.IO):** same port as the API (4000)
 
 ---
 
-## ⚡ Quick Start Guide
+## 🖥️ Local Development (without Docker)
 
-### 1. Prerequisites
-- **Node.js**: v20 or higher
-- **pnpm**: v9 or higher (`npm install -g pnpm`)
-- **Docker**: For local PostgreSQL and Redis
+Prerequisites: **Node.js v20+** and a local PostgreSQL on `localhost:5432` (`DATABASE_URL` in `apps/api/.env` — see `.env.example`).
 
-### 2. Start PostgreSQL & Redis
 ```bash
-docker compose up -d
+npm install
+npm run db:generate   # generate Prisma client
+npm run db:migrate    # sync schema to your local database
+npm run db:seed       # seed the 4 founding partners + accounts + categories
+npm run dev           # runs Web (3000) + API (4000) together
 ```
 
-### 3. Install Dependencies
-```bash
-pnpm install
-```
-
-### 4. Database Setup (Prisma)
-```bash
-# Generate Prisma Client
-pnpm db:generate
-
-# Apply migrations
-pnpm db:migrate
-
-# Seed 4 Founding Partners, Accounts, Categories & Permissions
-pnpm db:seed
-```
-
-### 5. Run Applications Concurrently
-```bash
-pnpm dev
-```
-- **Web Platform:** [http://localhost:3000](http://localhost:3000)
-- **API Backend:** [http://localhost:4000/api/v1](http://localhost:4000/api/v1)
-- **API Swagger Docs:** [http://localhost:4000/docs](http://localhost:4000/docs)
+> 💡 If the API is not running, the web app still works in **offline/demo mode** (data stays in the browser) and the Topbar shows a "وضع تجريبي" badge. When the API is reachable, login becomes fully JWT-secured and everything syncs to PostgreSQL.
 
 ---
 
-## 🏛️ Initial Seeded Founding Partners (25% Each)
+## 🏛️ Seeded Founding Partners (25% Each)
 
-| Partner | Title & Unit | Initial Ownership | Voting Power |
+| Partner | Title | Initial Ownership | Voting Power |
 |---|---|---|---|
-| **Ahmed Mansour** | Managing Partner & Strategy | 25.00% | 1 Vote (Equal) |
-| **Sarah El-Sayed** | Technical Partner & CTO (BU-AI) | 25.00% | 1 Vote (Equal) |
-| **Tarek Hassan** | Financial Partner & CFO (FIN-OPS) | 25.00% | 1 Vote (Equal) |
-| **Nour Khalil** | Operations Partner & COO (BU-DTC) | 25.00% | 1 Vote (Equal) |
+| **Mahmoud Ashraf** | Managing Partner & Strategy | 25.00% | 1 Vote (Equal) |
+| **Ahmed Elsadny** | Technical Partner & Technology | 25.00% | 1 Vote (Equal) |
+| **Ahmed Fouda** | Commercial & Financial Partner | 25.00% | 1 Vote (Equal) |
+| **Mohamed Monem** | Operations & Execution Partner | 25.00% | 1 Vote (Equal) |
 
-*Default seed password for all initial partners:* `Fekra@2026!`
+| Email | Initial Password |
+|---|---|
+| `Mahmoud@fekra.com` | `20101510` |
+| `Elsadny@fekra.com` | `ahmed01285217746` |
+| `Fouda@fekra.com` | `fouda11111fekra` |
+| `Monem@fekra.com` | `monem1214##fekra` |
+
+> ⚠️ These are INITIAL passwords — change them right after the first deployment (see DEPLOY.md §7).
 
 ---
 
@@ -104,7 +73,30 @@ Implemented in `apps/api/src/modules/finance/finance.service.ts` using Prisma in
 - Only eligible active partners can vote.
 - Exactly 4 active partners are expected.
 - **Any single `REJECT`** immediately marks the transaction `REJECTED`.
-- **Exactly 4 `APPROVE`** marks the transaction `APPROVED`.
+- **Exactly 4 `APPROVE`** marks the transaction `APPROVED` (and it is deducted from the treasury the same day).
 - 3 approvals are not sufficient.
 - Abstentions do not count toward approval.
-- An immutable audit trail is appended for each vote cast.
+- An immutable audit trail + real-time notification is emitted for each vote cast.
+
+---
+
+## 🧱 Architecture Overview
+
+```text
+apps/
+├── web/                # Next.js 14 (App Router, Tailwind, RTL-first, Socket.IO client, Jitsi calls)
+└── api/                # NestJS 10 modular API
+    └── src/modules/
+        ├── auth/          # JWT login (argon2)
+        ├── partners/       # Partners & ownership
+        ├── finance/        # Treasury, deposits, expenses, unanimous 4/4 vote engine
+        ├── projects/       # Projects & tasks (with live assignee notifications)
+        ├── chat/           # Socket.IO gateway + persistent chat rooms (group / DM / project)
+        ├── notifications/  # Persistent + real-time notifications
+        └── audit/           # Immutable audit trail
+
+packages/shared-types/  # Enums, DTO contracts & 4-partner governance evaluation
+docker-compose.prod.yml # One-command production stack (PostgreSQL + API + Web)
+DEPLOY.md               # Full server deployment guide (Arabic)
+```
+

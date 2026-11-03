@@ -11,9 +11,10 @@ async function bootstrap() {
   // Global API Prefix as defined in technical spec
   app.setGlobalPrefix('api/v1');
 
-  // Enable CORS
   app.enableCors({
-    origin: [process.env.APP_URL || 'http://localhost:3000'],
+    // Reflect the requesting origin so the platform is reachable from
+    // localhost AND any server IP / domain without extra configuration.
+    origin: true,
     credentials: true,
   });
 

@@ -1,6 +1,9 @@
 'use client';
 
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { usePersistentState } from '../hooks/usePersistentState';
+import { api } from '../lib/api';
+import { useAuth } from './AuthContext';
 
 export interface FinancialAccount {
   id: string;
@@ -24,6 +27,15 @@ export interface TransactionRecord {
   date: string;
   description?: string;
   status: 'COMPLETED' | 'PENDING_APPROVAL';
+  /** Linked project for incomes coming from a specific client project */
+  projectId?: string;
+  projectName?: string;
+}
+
+export interface FinancialCategoryOption {
+  id: string;
+  name: string;
+  transactionType: string;
 }
 
 interface FinanceContextType {
@@ -34,6 +46,12 @@ interface FinanceContextType {
   thisMonthRevenue: number;
   netCashFlow: number;
   transactions: TransactionRecord[];
+  /** True when data is served live from the backend API. */
+  isLiveMode: boolean;
+  /** Financial categories from the backend (for deposit/expense pickers). */
+  categories: FinancialCategoryOption[];
+  /** Re-hydrates finance data from the backend (no-op in offline mode). */
+  refreshFinance: () => Promise<void>;
   addDeposit: (params: {
     amount: number;
     accountId: string;
@@ -41,6 +59,8 @@ interface FinanceContextType {
     category: string;
     description?: string;
     createdBy: string;
+    projectId?: string;
+    projectName?: string;
   }) => void;
   addExpense: (params: {
     amount: number;
@@ -49,97 +69,117 @@ interface FinanceContextType {
     category: string;
     description: string;
     requester: string;
+    projectId?: string;
+    projectName?: string;
   }) => void;
 }
 
+// Company treasury structure — balances start at ZERO (no fake data).
 const INITIAL_ACCOUNTS: FinancialAccount[] = [
   {
     id: 'acc-cib',
     name: 'حساب CIB الرئيسي للشركة',
     type: 'BANK',
-    accountNumber: 'EG-1900-8844-01',
-    balance: 1850000,
+    accountNumber: '',
+    balance: 0,
     currency: 'ج.م',
   },
   {
     id: 'acc-cash',
     name: 'خزينة النقدية والتشغيل (Petty Cash)',
     type: 'CASH',
-    balance: 120000,
+    balance: 0,
     currency: 'ج.م',
   },
 ];
 
-const INITIAL_TRANSACTIONS: TransactionRecord[] = [
-  {
-    id: 'TX-901',
-    type: 'INCOME',
-    title: 'دفعة تعاقد مشروع الذكاء الاصطناعي - شركة النيل',
-    amount: 350000,
-    currency: 'ج.م',
-    accountId: 'acc-cib',
-    accountName: 'حساب CIB الرئيسي للشركة',
-    category: 'عقود برمجيات وحلول ذكية',
-    sourceOrRequester: 'Nile Enterprises LLC',
-    date: '2026-10-28',
-    description: 'دفعة مقدمة 40% من العقد السنوي',
-    status: 'COMPLETED',
-  },
-  {
-    id: 'TX-902',
-    type: 'EXPENSE',
-    title: 'تجديد اشتراكات سيرفرات GPU ومعالجات الذكاء الاصطناعي',
-    amount: 85000,
-    currency: 'ج.م',
-    accountId: 'acc-cib',
-    accountName: 'حساب CIB الرئيسي للشركة',
-    category: 'سيرفرات وبنية تحتية',
-    sourceOrRequester: 'فريق الهندسة والتقنية',
-    date: '2026-10-25',
-    description: 'خوادم التدريب الشهري AWS & RunPod',
-    status: 'COMPLETED',
-  },
-  {
-    id: 'TX-903',
-    type: 'INCOME',
-    title: 'استشارات التحول الرقمي وتطوير الأعمال',
-    amount: 130000,
-    currency: 'ج.م',
-    accountId: 'acc-cib',
-    accountName: 'حساب CIB الرئيسي للشركة',
-    category: 'استشارات رقمية',
-    sourceOrRequester: 'Delta Logistics Holding',
-    date: '2026-10-20',
-    description: 'المرحلة الأولى من دراسة الجدوى وتخطيط الأنظمة',
-    status: 'COMPLETED',
-  },
-  {
-    id: 'TX-904',
-    type: 'EXPENSE',
-    title: 'مصاريف تشغيلية ومقر الشركة وتجهيزات العمل',
-    amount: 60000,
-    currency: 'ج.م',
-    accountId: 'acc-cash',
-    accountName: 'خزينة النقدية والتشغيل (Petty Cash)',
-    category: 'تشغيل ومرافق مقر',
-    sourceOrRequester: 'إدارة العمليات',
-    date: '2026-10-15',
-    description: 'فواتير إنترنت فايبر وتجهيزات تقنية داخلية',
-    status: 'COMPLETED',
-  },
-];
+// Transactions start EMPTY — real records come from user actions / the API.
+const INITIAL_TRANSACTIONS: TransactionRecord[] = [];
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
 export function FinanceProvider({ children }: { children: React.ReactNode }) {
-  const [accounts, setAccounts] = useState<FinancialAccount[]>(INITIAL_ACCOUNTS);
-  const [transactions, setTransactions] = useState<TransactionRecord[]>(INITIAL_TRANSACTIONS);
+  const { isLiveMode: authLive } = useAuth();
+
+  // Persisted state — survives page refresh via localStorage (offline cache)
+  const [accounts, setAccounts] = usePersistentState<FinancialAccount[]>('fekra_finance_accounts_v2', INITIAL_ACCOUNTS);
+  const [transactions, setTransactions] = usePersistentState<TransactionRecord[]>('fekra_finance_transactions_v2', INITIAL_TRANSACTIONS);
+
+  const [isLiveMode, setIsLiveMode] = useState(false);
+  const [categories, setCategories] = useState<FinancialCategoryOption[]>([]);
+
+  /**
+   * Hydrate finance data from the live backend API.
+   * Falls back silently to the offline cache when the API is unreachable.
+   */
+  const refreshFinance = useCallback(async () => {
+    try {
+      const [accs, txs, cats] = await Promise.all([
+        api<any[]>('/finance/accounts'),
+        api<any[]>('/finance/transactions?take=200'),
+        api<any[]>('/finance/categories'),
+      ]);
+
+      const mappedAccounts: FinancialAccount[] = accs.map((a) => ({
+        id: a.id,
+        name: a.name,
+        type: a.accountType === 'BANK' ? 'BANK' : 'CASH',
+        accountNumber: undefined,
+        balance: a.currentBalance ?? Number(a.openingBalance ?? 0),
+        currency: 'ج.م',
+      }));
+
+      const mappedTxs: TransactionRecord[] = txs.map((t) => ({
+        id: t.id,
+        type: t.type,
+        title: t.description,
+        amount: Number(t.amount),
+        currency: 'ج.م',
+        accountId: t.accountId,
+        accountName: t.account?.name || '',
+        category: t.category?.name || '',
+        sourceOrRequester: t.createdBy?.fullName || '',
+        date: (t.transactionDate || '').slice(0, 10),
+        description: t.description,
+        status: t.approvalStatus === 'APPROVED' ? 'COMPLETED' : 'PENDING_APPROVAL',
+      }));
+
+      setAccounts(mappedAccounts);
+      setTransactions(mappedTxs);
+      setCategories(
+        cats.map((c) => ({ id: c.id, name: c.name, transactionType: c.transactionType })),
+      );
+      setIsLiveMode(true);
+    } catch {
+      setIsLiveMode(false);
+    }
+  }, []);
+
+  // Fetch live data once the user session is authenticated with the backend
+  useEffect(() => {
+    if (authLive) {
+      refreshFinance();
+    }
+  }, [authLive, refreshFinance]);
 
   // Financial analytics calculations
   const totalBalance = accounts.reduce((acc, a) => acc + a.balance, 0);
-  const thisMonthExpenses = 145000;
-  const lastMonthExpenses = 195000;
-  const thisMonthRevenue = 480000;
+
+  // Real monthly analytics derived from actual recorded transactions
+  const now = new Date();
+  const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  const thisKey = monthKey(now);
+  const lastKey = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+
+  const thisMonthExpenses = transactions
+    .filter((t) => t.type === 'EXPENSE' && t.date.slice(0, 7) === thisKey)
+    .reduce((sum, t) => sum + t.amount, 0);
+  const lastMonthExpenses = transactions
+    .filter((t) => t.type === 'EXPENSE' && t.date.slice(0, 7) === lastKey)
+    .reduce((sum, t) => sum + t.amount, 0);
+  const thisMonthRevenue = transactions
+    .filter((t) => t.type === 'INCOME' && t.date.slice(0, 7) === thisKey)
+    .reduce((sum, t) => sum + t.amount, 0);
   const netCashFlow = thisMonthRevenue - thisMonthExpenses;
 
   const addDeposit = (params: {
@@ -149,7 +189,32 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     category: string;
     description?: string;
     createdBy: string;
+    projectId?: string;
+    projectName?: string;
   }) => {
+    // LIVE MODE: create the deposit on the backend, then re-hydrate from source of truth
+    if (isLiveMode) {
+      const matchedCategory = categories.find(
+        (c) => c.transactionType === 'INCOME' && (c.name === params.category || !params.category),
+      );
+      api('/finance/deposits', {
+        method: 'POST',
+        body: JSON.stringify({
+          accountId: params.accountId,
+          amount: params.amount,
+          categoryId: matchedCategory?.id,
+          source: params.source,
+          description: params.projectName
+            ? `${params.description || ''} (مشروع: ${params.projectName})`.trim()
+            : params.description,
+        }),
+      })
+        .then(() => refreshFinance())
+        .catch((err) => console.error('Deposit failed on server:', err));
+      return;
+    }
+
+    // OFFLINE MODE: update the local persisted cache
     const targetAcc = accounts.find((a) => a.id === params.accountId) || accounts[0];
 
     // Update account balance
@@ -163,7 +228,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const newTx: TransactionRecord = {
       id: `TX-${Date.now().toString().slice(-4)}`,
       type: 'INCOME',
-      title: `إيداع جديد: ${params.source}`,
+      title: params.projectName
+        ? `إيداع جديد: ${params.source} (مشروع: ${params.projectName})`
+        : `إيداع جديد: ${params.source}`,
       amount: params.amount,
       currency: 'ج.م',
       accountId: targetAcc.id,
@@ -173,6 +240,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       date: new Date().toISOString().split('T')[0],
       description: params.description || `تم الإيداع بواسطة ${params.createdBy}`,
       status: 'COMPLETED',
+      projectId: params.projectId,
+      projectName: params.projectName,
     };
 
     setTransactions((prev) => [newTx, ...prev]);
@@ -185,13 +254,40 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     category: string;
     description: string;
     requester: string;
+    projectId?: string;
+    projectName?: string;
   }) => {
+    // LIVE MODE: submit to the backend → enters the 4/4 unanimous approval flow
+    if (isLiveMode) {
+      const matchedCategory = categories.find(
+        (c) => c.transactionType === 'EXPENSE' && (c.name === params.category || !params.category),
+      );
+      api('/finance/expenses', {
+        method: 'POST',
+        body: JSON.stringify({
+          accountId: params.accountId,
+          amount: params.amount,
+          categoryId: matchedCategory?.id,
+          title: params.title,
+          description: params.projectName
+            ? `${params.description || ''} (مشروع: ${params.projectName})`.trim()
+            : params.description,
+        }),
+      })
+        .then(() => refreshFinance())
+        .catch((err) => console.error('Expense submission failed on server:', err));
+      return;
+    }
+
+    // OFFLINE MODE: record in the local persisted cache
     const targetAcc = accounts.find((a) => a.id === params.accountId) || accounts[0];
 
     const newTx: TransactionRecord = {
       id: `TX-${Date.now().toString().slice(-4)}`,
       type: 'EXPENSE',
-      title: params.title,
+      title: params.projectName
+        ? `${params.title} (مشروع: ${params.projectName})`
+        : params.title,
       amount: params.amount,
       currency: 'ج.م',
       accountId: targetAcc.id,
@@ -201,6 +297,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       date: new Date().toISOString().split('T')[0],
       description: params.description,
       status: 'PENDING_APPROVAL',
+      projectId: params.projectId,
+      projectName: params.projectName,
     };
 
     setTransactions((prev) => [newTx, ...prev]);
@@ -216,6 +314,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         thisMonthRevenue,
         netCashFlow,
         transactions,
+        isLiveMode,
+        categories,
+        refreshFinance,
         addDeposit,
         addExpense,
       }}

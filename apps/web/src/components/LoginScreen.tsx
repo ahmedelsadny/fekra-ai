@@ -25,12 +25,12 @@ export const LoginScreen: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     setIsSubmitting(true);
 
-    const res = login(email, password);
+    const res = await login(email, password);
     setIsSubmitting(false);
 
     if (!res.success) {
@@ -40,15 +40,12 @@ export const LoginScreen: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-navy-950 flex flex-col justify-center items-center p-4 relative overflow-hidden select-none">
-      {/* Background Ambient Lighting */}
-      <div className="absolute top-1/4 -start-32 w-96 h-96 rounded-full bg-cyan/15 blur-[128px] pointer-events-none"></div>
-      <div className="absolute bottom-1/4 -end-32 w-96 h-96 rounded-full bg-electric-600/15 blur-[128px] pointer-events-none"></div>
 
       {/* Language Switcher in top corner */}
       <div className="absolute top-6 end-6">
         <button
           onClick={toggleLanguage}
-          className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-navy-900 border border-surface-border hover:border-cyan/40 text-xs font-semibold text-slate-300 hover:text-white transition"
+          className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-navy-900 border border-surface-border hover:border-cyan/40 text-xs font-semibold text-slate-600 hover:text-slate-900 transition"
         >
           <Globe className="w-3.5 h-3.5 text-cyan" />
           <span>{language === 'ar' ? 'English' : 'العربية (RTL)'}</span>
@@ -63,13 +60,13 @@ export const LoginScreen: React.FC = () => {
             <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-cyan to-electric-600 flex items-center justify-center text-navy-950 font-black shadow-glow-cyan mb-3">
               <Sparkles className="w-7 h-7 fill-navy-950" />
             </div>
-            <h1 className="text-2xl font-black text-white tracking-wider flex items-center justify-center gap-2">
+            <h1 className="text-2xl font-black text-slate-900 tracking-wider flex items-center justify-center gap-2">
               FEKRA <span className="text-cyan font-mono text-base px-2 py-0.5 rounded bg-cyan-dim border border-cyan/40">AI</span>
             </h1>
             <p className="text-xs text-cyan font-medium mt-1">
               نظام التشغيل المؤسسي الداخلي
             </p>
-            <p className="text-[11px] text-slate-400 mt-1">
+            <p className="text-[11px] text-slate-500 mt-1">
               Internal Company Operating System
             </p>
           </div>
@@ -85,40 +82,40 @@ export const LoginScreen: React.FC = () => {
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1.5">
+              <label className="block text-xs font-bold text-slate-600 mb-1.5">
                 البريد الإلكتروني (Email)
               </label>
               <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute start-3.5 top-1/2 -translate-y-1/2" />
+                <Mail className="w-4 h-4 text-slate-500 absolute start-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@fekra.com"
-                  className="w-full bg-navy-950/80 border border-surface-border rounded-xl ps-10 pe-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan focus:ring-1 focus:ring-cyan/40 transition font-mono"
+                  className="w-full bg-surface-card border border-surface-border rounded-xl ps-10 pe-4 py-3 text-xs text-slate-900 placeholder-slate-500 focus:outline-none focus:border-cyan focus:ring-1 focus:ring-cyan/40 transition font-mono"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1.5">
+              <label className="block text-xs font-bold text-slate-600 mb-1.5">
                 كلمة المرور (Password)
               </label>
               <div className="relative">
-                <Lock className="w-4 h-4 text-slate-400 absolute start-3.5 top-1/2 -translate-y-1/2" />
+                <Lock className="w-4 h-4 text-slate-500 absolute start-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••••"
-                  className="w-full bg-navy-950/80 border border-surface-border rounded-xl ps-10 pe-10 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan focus:ring-1 focus:ring-cyan/40 transition font-mono"
+                  className="w-full bg-surface-card border border-surface-border rounded-xl ps-10 pe-10 py-3 text-xs text-slate-900 placeholder-slate-500 focus:outline-none focus:border-cyan focus:ring-1 focus:ring-cyan/40 transition font-mono"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute end-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                  className="absolute end-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-900"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -136,7 +133,7 @@ export const LoginScreen: React.FC = () => {
           </form>
 
           {/* Security Notice */}
-          <div className="mt-6 pt-5 border-t border-surface-border/60 flex items-center gap-2 text-[10px] text-slate-400">
+          <div className="mt-6 pt-5 border-t border-surface-border/60 flex items-center gap-2 text-[10px] text-slate-500">
             <ShieldCheck className="w-4 h-4 text-cyan shrink-0" />
             <span>تسجيل الدخول مشفر ومخصص فقط للحسابات المعتمدة داخل الشركة.</span>
           </div>

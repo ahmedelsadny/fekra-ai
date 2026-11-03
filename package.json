@@ -8,12 +8,17 @@
     "packages/*"
   ],
   "scripts": {
+    "dev": "concurrently -n WEB,API -c cyan,green \"npm run dev:web\" \"npm run dev:api\"",
     "dev:web": "npm --prefix apps/web run dev",
     "dev:api": "npm --prefix apps/api run start:dev",
     "build:web": "npm --prefix apps/web run build",
-    "build:api": "npm --prefix apps/api run build"
+    "build:api": "npm --prefix apps/api run build",
+    "db:generate": "npm --prefix apps/api run prisma:generate",
+    "db:migrate": "npm --prefix apps/api run prisma:migrate",
+    "db:seed": "npm --prefix apps/api run prisma:seed"
   },
   "devDependencies": {
+    "concurrently": "^8.2.2",
     "prettier": "^3.2.5",
     "typescript": "^5.4.5"
   }

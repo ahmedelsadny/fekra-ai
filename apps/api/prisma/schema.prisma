@@ -154,6 +154,7 @@ model Organization {
   auditLogs     AuditLog[]
   files         StoredFile[]
   invitations   Invitation[]
+  chatRooms     ChatRoom[]
 }
 
 model User {
@@ -183,6 +184,7 @@ model User {
   uploadedFiles       StoredFile[]
   refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
+  chatMessages        ChatMessage[]
 }
 
 model RefreshToken {
@@ -789,4 +791,40 @@ model AuditLog {
 
   @@index([organizationId, createdAt])
   @@index([entityType, entityId])
+}
+
+// ============ Real-time Chat (Meetings / DMs / Project rooms) ============
+
+model ChatRoom {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  // Stable room key: 'partners-hq' | 'dm-<a>-<b>' | 'project-<projectId>'
+  slug           String
+  // GROUP | DM | PROJECT
+  type           String   @default("GROUP")
+  name           String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  messages     ChatMessage[]
+
+  @@unique([organizationId, slug])
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid()) @db.Uuid
+  roomId    String   @db.Uuid
+  senderId  String   @db.Uuid
+  content   String?
+  fileName  String?
+  fileType  String?
+  // Small inline attachments stored as data URLs (limit ~1.5MB)
+  dataUrl   String?
+  createdAt DateTime @default(now())
+
+  room   ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, createdAt])
 }

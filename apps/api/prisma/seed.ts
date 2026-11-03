@@ -66,9 +66,7 @@ async function main() {
     const passwordHash = await argon2.hash(p.passwordPlain);
     const user = await prisma.user.upsert({
       where: { email: p.email },
-      update: {
-        passwordHash,
-      },
+      update: {},
       create: {
         fullName: p.fullName,
         email: p.email,
@@ -187,22 +185,25 @@ async function main() {
   }
 
   // Assign Partner role to the 4 partners
+  // NOTE: the compound unique contains nullable columns, so we use a
+  // findFirst guard instead of upsert (Prisma does not allow null in unique where inputs).
   for (const memberId of createdPartnerMembers) {
-    await prisma.userRole.upsert({
+    const existingAssignment = await prisma.userRole.findFirst({
       where: {
-        memberId_roleId_businessUnitId_departmentId: {
-          memberId,
-          roleId: partnerRole.id,
-          businessUnitId: null as any,
-          departmentId: null as any,
-        },
-      },
-      update: {},
-      create: {
         memberId,
         roleId: partnerRole.id,
+        businessUnitId: null,
+        departmentId: null,
       },
     });
+    if (!existingAssignment) {
+      await prisma.userRole.create({
+        data: {
+          memberId,
+          roleId: partnerRole.id,
+        },
+      });
+    }
   }
 
   // 4. Default Business Units
@@ -251,28 +252,41 @@ async function main() {
     },
   });
 
-  // 6. Financial Accounts
-  const cibAccount = await prisma.financialAccount.create({
-    data: {
-      organizationId: org.id,
-      name: 'CIB Corporate Main Account',
-      accountType: AccountType.BANK,
-      currency: 'EGP',
-      openingBalance: 750000.0,
-      isActive: true,
-    },
+  // 6. Financial Accounts (guarded — seed runs on every container start,
+  //    so we must never create duplicates)
+  const existingCib = await prisma.financialAccount.findFirst({
+    where: { organizationId: org.id, name: 'CIB Corporate Main Account' },
   });
 
-  await prisma.financialAccount.create({
-    data: {
-      organizationId: org.id,
-      name: 'Main Operating Cash Wallet',
-      accountType: AccountType.CASH,
-      currency: 'EGP',
-      openingBalance: 35000.0,
-      isActive: true,
-    },
+  const cibAccount = existingCib
+    ? existingCib
+    : await prisma.financialAccount.create({
+        data: {
+          organizationId: org.id,
+          name: 'CIB Corporate Main Account',
+          accountType: AccountType.BANK,
+          currency: 'EGP',
+          openingBalance: 0,
+          isActive: true,
+        },
+      });
+
+  const existingCash = await prisma.financialAccount.findFirst({
+    where: { organizationId: org.id, name: 'Main Operating Cash Wallet' },
   });
+
+  if (!existingCash) {
+    await prisma.financialAccount.create({
+      data: {
+        organizationId: org.id,
+        name: 'Main Operating Cash Wallet',
+        accountType: AccountType.CASH,
+        currency: 'EGP',
+        openingBalance: 0,
+        isActive: true,
+      },
+    });
+  }
 
   // 7. Financial Categories
   await prisma.financialCategory.createMany({
@@ -284,6 +298,18 @@ async function main() {
       { organizationId: org.id, name: 'Engineering Salaries & Contractors', transactionType: TransactionType.EXPENSE },
       { organizationId: org.id, name: 'Office & Facilities', transactionType: TransactionType.EXPENSE },
       { organizationId: org.id, name: 'Legal, Licensing & Compliance', transactionType: TransactionType.EXPENSE },
+      // Arabic categories — matching the frontend pickers
+      { organizationId: org.id, name: 'عقود برمجيات وحلول ذكية', transactionType: TransactionType.INCOME },
+      { organizationId: org.id, name: 'استشارات رقمية وتطوير أعمال', transactionType: TransactionType.INCOME },
+      { organizationId: org.id, name: 'زيادة رأس مال واستثمار شركاء', transactionType: TransactionType.INCOME },
+      { organizationId: org.id, name: 'إيرادات أخرى متنوعة', transactionType: TransactionType.INCOME },
+      { organizationId: org.id, name: 'سيرفرات وبنية تحتية', transactionType: TransactionType.EXPENSE },
+      { organizationId: org.id, name: 'مرتبات ومكافآت هندسية', transactionType: TransactionType.EXPENSE },
+      { organizationId: org.id, name: 'تشغيل ومقر الشركة', transactionType: TransactionType.EXPENSE },
+      { organizationId: org.id, name: 'تسويق وإعلانات', transactionType: TransactionType.EXPENSE },
+      { organizationId: org.id, name: 'قانوني وتراخيص', transactionType: TransactionType.EXPENSE },
+      // Fixed recurring expenses — require unanimous 4/4 approval, deducted same day
+      { organizationId: org.id, name: 'مصاريف ثابتة', transactionType: TransactionType.EXPENSE },
     ],
   });
 

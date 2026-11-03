@@ -10,17 +10,18 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Light, premium "White + Light Blue" theme
         navy: {
-          950: '#050914',
-          900: '#0A1024',
-          800: '#111A36',
-          700: '#1A274E',
-          600: '#263768',
+          950: '#F2F7FE', // page background — airy blue-white
+          900: '#FFFFFF', // main panels & cards
+          800: '#EAF1FC', // subtle secondary panels
+          700: '#D8E6F9',
+          600: '#C2D8F3',
         },
         cyan: {
-          DEFAULT: '#00F0FF',
-          hover: '#33F3FF',
-          dim: 'rgba(0, 240, 255, 0.12)',
+          DEFAULT: '#1E7CF7', // rich sky-blue accent
+          hover: '#3D8DFF',
+          dim: 'rgba(30, 124, 247, 0.10)',
         },
         electric: {
           500: '#0EA5E9',
@@ -28,19 +29,38 @@ const config: Config = {
           700: '#0369A1',
         },
         surface: {
-          DEFAULT: '#0D152A',
-          card: '#121B35',
-          border: 'rgba(255, 255, 255, 0.08)',
-          'border-highlight': 'rgba(0, 240, 255, 0.25)',
+          DEFAULT: '#FFFFFF',
+          card: '#F7FAFF',
+          border: 'rgba(13, 74, 148, 0.12)',
+          'border-highlight': 'rgba(30, 124, 247, 0.35)',
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['IBM Plex Sans Arabic', 'Inter', 'system-ui', 'sans-serif'],
         arabic: ['IBM Plex Sans Arabic', 'Cairo', 'sans-serif'],
       },
       boxShadow: {
-        'glow-cyan': '0 0 25px -5px rgba(0, 240, 255, 0.3)',
-        'glow-card': '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
+        'glow-cyan': '0 6px 22px -6px rgba(30, 124, 247, 0.45)',
+        'glow-card': '0 10px 32px -14px rgba(13, 74, 148, 0.22)',
+      },
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        fadeInUp: {
+          '0%': { opacity: '0', transform: 'translateY(14px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        scaleIn: {
+          '0%': { opacity: '0', transform: 'scale(0.95)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
+      },
+      animation: {
+        fadeIn: 'fadeIn 0.25s ease-out both',
+        fadeInUp: 'fadeInUp 0.45s ease-out both',
+        scaleIn: 'scaleIn 0.25s ease-out both',
       },
     },
   },

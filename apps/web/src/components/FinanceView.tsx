@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import { useFinance } from '../context/FinanceContext';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, AUTHORIZED_PARTNERS } from '../context/AuthContext';
+import { useProjects } from '../context/ProjectContext';
 import {
   Wallet,
   Building,
@@ -16,11 +17,19 @@ import {
   TrendingUp,
   Receipt,
   AlertCircle,
+  Repeat,
 } from 'lucide-react';
 
 export const FinanceView: React.FC = () => {
-  const { accounts, totalBalance, transactions, addDeposit, addExpense } = useFinance();
+  const { accounts, totalBalance, transactions, addDeposit, addExpense, isLiveMode: financeLive } = useFinance();
   const { user } = useAuth();
+  const { projects } = useProjects();
+  const { pushNotification } = useProjects();
+
+  const myDirId =
+    AUTHORIZED_PARTNERS.find((p) => p.email.toLowerCase() === (user?.email || '').toLowerCase())
+      ?.id || 'p1';
+  const otherPartnerIds = AUTHORIZED_PARTNERS.filter((p) => p.id !== myDirId).map((p) => p.id);
 
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
@@ -34,6 +43,7 @@ export const FinanceView: React.FC = () => {
   const [depositSource, setDepositSource] = useState('');
   const [depositCategory, setDepositCategory] = useState('عقود برمجيات وحلول ذكية');
   const [depositNotes, setDepositNotes] = useState('');
+  const [depositProject, setDepositProject] = useState('');
 
   // Expense Form State
   const [expenseTitle, setExpenseTitle] = useState('');
@@ -41,6 +51,29 @@ export const FinanceView: React.FC = () => {
   const [expenseAccount, setExpenseAccount] = useState('acc-cib');
   const [expenseCategory, setExpenseCategory] = useState('سيرفرات وبنية تحتية');
   const [expenseDesc, setExpenseDesc] = useState('');
+  // Fixed-expense mode (تتخصم في نفس يوم اعتماد الشركاء 4/4)
+  const [isFixedExpense, setIsFixedExpense] = useState(false);
+  // Project/company link for the expense (عام على الشركة أو لمشروع محدد)
+  const [expenseProject, setExpenseProject] = useState('');
+
+  /** Opens the expense modal in "fixed expense" mode */
+  const openFixedExpenseModal = () => {
+    setIsFixedExpense(true);
+    setExpenseCategory('مصاريف ثابتة');
+    setIsExpenseModalOpen(true);
+  };
+
+  /** Opens the expense modal in normal mode */
+  const openExpenseModal = () => {
+    setIsFixedExpense(false);
+    setIsExpenseModalOpen(true);
+  };
+
+  // Fixed expenses (category = مصاريف ثابتة)
+  const fixedExpenses = transactions.filter(
+    (tx) => tx.type === 'EXPENSE' && tx.category === 'مصاريف ثابتة',
+  );
+  const totalFixed = fixedExpenses.reduce((sum, tx) => sum + tx.amount, 0);
 
   const handleDepositSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,7 +87,19 @@ export const FinanceView: React.FC = () => {
       category: depositCategory,
       description: depositNotes,
       createdBy: user?.name || 'أحد الشركاء',
+      projectId: depositProject || undefined,
+      projectName: projects.find((p) => p.id === depositProject)?.name,
     });
+
+    // Notify the other partners about the new deposit (offline only —
+    // in live mode the backend sends real cross-device notifications)
+    if (!financeLive) {
+      pushNotification(
+        otherPartnerIds,
+        'إيداع جديد في الخزينة',
+        `${user?.name} أودع مبلغ ${parsedAmount.toLocaleString()} ج.م${depositProject ? ` على مشروع` : ''} — الرصيد اتحدث للكل.`,
+      );
+    }
 
     setSuccessMessage(`تم إضافة مبلغ ${parsedAmount.toLocaleString()} ج.م إلى رصيد الخزينة بنجاح!`);
     setDepositAmount('');
@@ -77,12 +122,26 @@ export const FinanceView: React.FC = () => {
       category: expenseCategory,
       description: expenseDesc,
       requester: user?.name || 'طلب مصروف جديد',
+      projectId: expenseProject || undefined,
+      projectName: projects.find((p) => p.id === expenseProject)?.name,
     });
+
+    // Notify the other partners — offline only (the backend sends real
+    // notifications with the 4/4 approval flow in live mode)
+    if (!financeLive) {
+      pushNotification(
+        otherPartnerIds,
+        'مصروف مستني اعتمادك',
+        `${user?.name} سجل ${isFixedExpense ? 'مصروف ثابت' : 'مصروف'} بمبلغ ${parsedAmount.toLocaleString()} ج.م — محتاج موافقة 4/4 شركاء.`,
+      );
+    }
 
     setSuccessMessage(`تم تسجيل المصروف بمبلغ ${parsedAmount.toLocaleString()} ج.م وإحالته لاعتماد الشركاء.`);
     setExpenseTitle('');
     setExpenseAmount('');
     setExpenseDesc('');
+    setExpenseProject('');
+    setIsFixedExpense(false);
     setIsExpenseModalOpen(false);
 
     setTimeout(() => setSuccessMessage(null), 5000);
@@ -106,8 +165,8 @@ export const FinanceView: React.FC = () => {
             <Building className="w-3.5 h-3.5" />
             <span>إدارة المالية والخزينة المركزية</span>
           </div>
-          <h2 className="text-xl font-black text-white tracking-wide">الخزينة والحسابات البنكية</h2>
-          <p className="text-xs text-slate-300 mt-1 max-w-xl">
+          <h2 className="text-xl font-black text-slate-900 tracking-wide">الخزينة والحسابات البنكية</h2>
+          <p className="text-xs text-slate-600 mt-1 max-w-xl">
             متابعة دقيقة وفورية للأرصدة النقدية في البنك والخزينة، وتسجيل إيداعات الإيرادات والمصروفات.
           </p>
         </div>
@@ -122,7 +181,14 @@ export const FinanceView: React.FC = () => {
             <span>إيداع رصيد جديد في حسابنا</span>
           </button>
           <button
-            onClick={() => setIsExpenseModalOpen(true)}
+            onClick={openFixedExpenseModal}
+            className="px-5 py-3 rounded-2xl bg-navy-900 hover:bg-navy-800 text-cyan border border-cyan/40 hover:border-cyan/60 text-xs font-bold transition flex items-center gap-2"
+          >
+            <Repeat className="w-4 h-4" />
+            <span>إضافة مصروف ثابت</span>
+          </button>
+          <button
+            onClick={openExpenseModal}
             className="px-5 py-3 rounded-2xl bg-navy-900 hover:bg-navy-800 text-rose-300 border border-rose-500/30 hover:border-rose-500/50 text-xs font-bold transition flex items-center gap-2"
           >
             <Receipt className="w-4 h-4" />
@@ -138,7 +204,7 @@ export const FinanceView: React.FC = () => {
             <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
             <span>{successMessage}</span>
           </div>
-          <button onClick={() => setSuccessMessage(null)} className="text-emerald-400 hover:text-white">
+          <button onClick={() => setSuccessMessage(null)} className="text-emerald-400 hover:text-slate-900">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -148,14 +214,14 @@ export const FinanceView: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Total Treasury */}
         <div className="p-6 rounded-2xl bg-gradient-to-br from-navy-900 to-navy-800 border border-cyan/40 shadow-glow-card relative overflow-hidden">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
+          <div className="flex items-center justify-between text-slate-500 mb-2">
             <span className="text-xs font-bold text-cyan">إجمالي رصيد الشركة (معانا كام دلوقتي)</span>
             <Wallet className="w-5 h-5 text-cyan" />
           </div>
-          <div className="text-2xl font-black text-white font-mono mt-1">
+          <div className="text-2xl font-black text-slate-900 font-mono mt-1">
             {totalBalance.toLocaleString()} <span className="text-sm font-sans font-normal text-cyan">ج.م</span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-2 font-mono">
+          <p className="text-[11px] text-slate-500 mt-2 font-mono">
             مجموع الرصيد المتاح حالياً في البنك والخزينة
           </p>
         </div>
@@ -163,30 +229,100 @@ export const FinanceView: React.FC = () => {
         {/* Bank Account (CIB) */}
         {accounts.map((acc) => (
           <div key={acc.id} className="p-6 rounded-2xl bg-navy-900/80 border border-surface-border">
-            <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-xs font-bold text-slate-200">{acc.name}</span>
+            <div className="flex items-center justify-between text-slate-500 mb-2">
+              <span className="text-xs font-bold text-slate-700">{acc.name}</span>
               {acc.type === 'BANK' ? (
                 <CreditCard className="w-5 h-5 text-electric-500" />
               ) : (
                 <Wallet className="w-5 h-5 text-amber-400" />
               )}
             </div>
-            <div className="text-2xl font-black text-white font-mono mt-1">
-              {acc.balance.toLocaleString()} <span className="text-sm font-sans font-normal text-slate-400">{acc.currency}</span>
+            <div className="text-2xl font-black text-slate-900 font-mono mt-1">
+              {acc.balance.toLocaleString()} <span className="text-sm font-sans font-normal text-slate-500">{acc.currency}</span>
             </div>
-            <p className="text-[11px] text-slate-400 mt-2 font-mono">
+            <p className="text-[11px] text-slate-500 mt-2 font-mono">
               {acc.accountNumber ? `رقم الحساب: ${acc.accountNumber}` : 'نقدية تشغيلية داخل المقر'}
             </p>
           </div>
         ))}
       </div>
 
+      {/* ================= Fixed Expenses (مصاريف ثابتة) ================= */}
+      <div className="glass-panel rounded-3xl p-6 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-surface-border">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-cyan-dim border border-cyan/40 text-cyan flex items-center justify-center">
+              <Repeat className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900">المصاريف الثابتة (تتكرر شهرياً)</h3>
+              <p className="text-xs text-slate-500">
+                إيجار، رواتب، سيرفرات... بتتخصم في نفس يوم اعتمادها بموافقة 4/4 شركاء
+              </p>
+            </div>
+          </div>
+          <div className="text-end">
+            <div className="text-xl font-black font-mono text-cyan">
+              {totalFixed.toLocaleString()} <span className="text-xs font-sans font-normal text-slate-500">ج.م</span>
+            </div>
+            <p className="text-[10px] text-slate-500">إجمالي المصاريف الثابتة المسجلة</p>
+          </div>
+        </div>
+
+        {fixedExpenses.length === 0 ? (
+          <p className="text-xs text-slate-500 text-center py-6">
+            لا توجد مصاريف ثابتة مسجلة بعد — اضغط "إضافة مصروف ثابت" فوق لبدء تسجيل الإيجارات والرواتب
+            والمصاريف الشهرية.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {fixedExpenses.map((tx) => (
+              <div
+                key={tx.id}
+                className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-surface-card border border-surface-border"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-navy-800 text-cyan border border-surface-border flex items-center justify-center shrink-0">
+                    <Repeat className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-slate-900 truncate">{tx.title}</div>
+                    <div className="text-[10px] text-slate-500 truncate">
+                      {tx.date} • طلب: {tx.sourceOrRequester}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  {tx.projectName && (
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-cyan-dim text-cyan border border-cyan/30 hidden sm:inline-block max-w-[180px] truncate">
+                      📁 {tx.projectName}
+                    </span>
+                  )}
+                  <span
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                      tx.status === 'COMPLETED'
+                        ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30'
+                        : 'bg-amber-500/10 text-amber-600 border-amber-500/30'
+                    }`}
+                  >
+                    {tx.status === 'COMPLETED' ? 'معتمد 4/4 واتخصم' : 'مستني اعتماد الشركاء'}
+                  </span>
+                  <span className="text-sm font-black font-mono text-slate-900">
+                    {tx.amount.toLocaleString()} ج.م
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Transactions History Header & Filters */}
       <div className="glass-panel rounded-2xl p-6 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-surface-border">
           <div>
-            <h3 className="text-base font-bold text-white">سجل العمليات والإيداعات المالية</h3>
-            <p className="text-xs text-slate-400">كشف حساب مباشر لجميع الإيداعات والمصروفات المسجلة</p>
+            <h3 className="text-base font-bold text-slate-900">سجل العمليات والإيداعات المالية</h3>
+            <p className="text-xs text-slate-500">كشف حساب مباشر لجميع الإيداعات والمصروفات المسجلة</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -195,7 +331,7 @@ export const FinanceView: React.FC = () => {
               <button
                 onClick={() => setFilterType('ALL')}
                 className={`px-3 py-1.5 rounded-lg transition ${
-                  filterType === 'ALL' ? 'bg-cyan text-navy-950' : 'text-slate-400 hover:text-white'
+                  filterType === 'ALL' ? 'bg-cyan text-navy-950' : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
                 الكل ({transactions.length})
@@ -203,7 +339,7 @@ export const FinanceView: React.FC = () => {
               <button
                 onClick={() => setFilterType('INCOME')}
                 className={`px-3 py-1.5 rounded-lg transition ${
-                  filterType === 'INCOME' ? 'bg-emerald-500 text-navy-950' : 'text-slate-400 hover:text-white'
+                  filterType === 'INCOME' ? 'bg-emerald-500 text-navy-950' : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
                 إيداعات وإيرادات
@@ -211,7 +347,7 @@ export const FinanceView: React.FC = () => {
               <button
                 onClick={() => setFilterType('EXPENSE')}
                 className={`px-3 py-1.5 rounded-lg transition ${
-                  filterType === 'EXPENSE' ? 'bg-rose-500 text-white' : 'text-slate-400 hover:text-white'
+                  filterType === 'EXPENSE' ? 'bg-rose-500 text-slate-900' : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
                 مصروفات
@@ -220,13 +356,13 @@ export const FinanceView: React.FC = () => {
 
             {/* Search */}
             <div className="relative w-48">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute start-3 top-1/2 -translate-y-1/2" />
+              <Search className="w-3.5 h-3.5 text-slate-500 absolute start-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 placeholder="بحث في السجل..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-navy-950 border border-surface-border rounded-xl ps-8 pe-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan/50"
+                className="w-full bg-navy-950 border border-surface-border rounded-xl ps-8 pe-3 py-1.5 text-xs text-slate-900 placeholder-slate-500 focus:outline-none focus:border-cyan/50"
               />
             </div>
           </div>
@@ -236,7 +372,7 @@ export const FinanceView: React.FC = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-start text-xs">
             <thead>
-              <tr className="border-b border-surface-border/60 text-slate-400 font-bold">
+              <tr className="border-b border-surface-border/60 text-slate-500 font-bold">
                 <th className="py-3 px-3 text-start">العملية / البيان</th>
                 <th className="py-3 px-3 text-start">الحساب المودع فيه / المصروف منه</th>
                 <th className="py-3 px-3 text-start">التصنيف</th>
@@ -261,20 +397,20 @@ export const FinanceView: React.FC = () => {
                           {isIncome ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
                         </div>
                         <div>
-                          <div className="font-bold text-white text-xs">{tx.title}</div>
-                          <div className="text-[11px] text-slate-400 mt-0.5">
-                            المصدر: <span className="text-slate-300">{tx.sourceOrRequester}</span>
+                          <div className="font-bold text-slate-900 text-xs">{tx.title}</div>
+                          <div className="text-[11px] text-slate-500 mt-0.5">
+                            المصدر: <span className="text-slate-600">{tx.sourceOrRequester}</span>
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="py-3.5 px-3 text-slate-300">{tx.accountName}</td>
+                    <td className="py-3.5 px-3 text-slate-600">{tx.accountName}</td>
                     <td className="py-3.5 px-3">
-                      <span className="px-2.5 py-1 rounded-lg bg-navy-950 text-slate-300 border border-surface-border text-[11px]">
+                      <span className="px-2.5 py-1 rounded-lg bg-navy-950 text-slate-600 border border-surface-border text-[11px]">
                         {tx.category}
                       </span>
                     </td>
-                    <td className="py-3.5 px-3 text-slate-400 font-mono text-[11px]">{tx.date}</td>
+                    <td className="py-3.5 px-3 text-slate-500 font-mono text-[11px]">{tx.date}</td>
                     <td className="py-3.5 px-3 text-end">
                       <span
                         className={`font-black font-mono text-sm ${
@@ -294,16 +430,16 @@ export const FinanceView: React.FC = () => {
 
       {/* MODAL: Deposit New Funds */}
       {isDepositModalOpen && (
-        <div className="fixed inset-0 z-50 bg-navy-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="glass-panel-cyan rounded-3xl p-6 w-full max-w-lg border border-cyan/40 shadow-glow-card animate-fadeIn">
+        <div className="fixed inset-0 z-50 bg-[#0B2447]/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="glass-panel-cyan rounded-3xl p-6 w-full max-w-lg border border-cyan/40 shadow-glow-card animate-scaleIn">
             <div className="flex items-center justify-between pb-4 border-b border-surface-border">
               <div className="flex items-center gap-2">
                 <PlusCircle className="w-5 h-5 text-cyan" />
-                <h3 className="text-base font-bold text-white">إيداع رصيد جديد في حسابنا</h3>
+                <h3 className="text-base font-bold text-slate-900">إيداع رصيد جديد في حسابنا</h3>
               </div>
               <button
                 onClick={() => setIsDepositModalOpen(false)}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-500 hover:text-slate-900"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -311,7 +447,7 @@ export const FinanceView: React.FC = () => {
 
             <form onSubmit={handleDepositSubmit} className="space-y-4 mt-5">
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
+                <label className="block text-xs font-bold text-slate-600 mb-1">
                   المبلغ المودع (بالجنيه المصري) *
                 </label>
                 <input
@@ -322,18 +458,18 @@ export const FinanceView: React.FC = () => {
                   placeholder="مثال: 150000"
                   value={depositAmount}
                   onChange={(e) => setDepositAmount(e.target.value)}
-                  className="w-full bg-navy-950 border border-surface-border rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan font-mono"
+                  className="w-full bg-navy-950 border border-surface-border rounded-xl px-4 py-2.5 text-xs text-slate-900 placeholder-slate-500 focus:outline-none focus:border-cyan font-mono"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
+                <label className="block text-xs font-bold text-slate-600 mb-1">
                   الحساب المودع فيه *
                 </label>
                 <select
                   value={depositAccount}
                   onChange={(e) => setDepositAccount(e.target.value)}
-                  className="w-full bg-navy-950 border border-surface-border rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-cyan"
+                  className="w-full bg-navy-950 border border-surface-border rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-cyan"
                 >
                   {accounts.map((acc) => (
                     <option key={acc.id} value={acc.id}>
@@ -344,7 +480,25 @@ export const FinanceView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
+                <label className="block text-xs font-bold text-slate-600 mb-1">
+                  الدخل ده من أنهي مشروع؟ (اختياري)
+                </label>
+                <select
+                  value={depositProject}
+                  onChange={(e) => setDepositProject(e.target.value)}
+                  className="w-full bg-navy-950 border border-surface-border rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-cyan"
+                >
+                  <option value="">— بدون مشروع محدد (إيراد عام للشركة) —</option>
+                  {projects.map((prj) => (
+                    <option key={prj.id} value={prj.id}>
+                      {prj.name} ({prj.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">
                   المصدر / اسم العميل أو الشريك المودع *
                 </label>
                 <input
@@ -353,16 +507,16 @@ export const FinanceView: React.FC = () => {
                   placeholder="مثال: دفعة تعاقد شركة كذا / إيداع شريك..."
                   value={depositSource}
                   onChange={(e) => setDepositSource(e.target.value)}
-                  className="w-full bg-navy-950 border border-surface-border rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan"
+                  className="w-full bg-navy-950 border border-surface-border rounded-xl px-4 py-2.5 text-xs text-slate-900 placeholder-slate-500 focus:outline-none focus:border-cyan"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">بند الإيراد</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1">بند الإيراد</label>
                 <select
                   value={depositCategory}
                   onChange={(e) => setDepositCategory(e.target.value)}
-                  className="w-full bg-navy-950 border border-surface-border rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-cyan"
+                  className="w-full bg-navy-950 border border-surface-border rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-cyan"
                 >
                   <option value="عقود برمجيات وحلول ذكية">عقود برمجيات وحلول ذكية</option>
                   <option value="استشارات رقمية وتطوير أعمال">استشارات رقمية وتطوير أعمال</option>
@@ -372,7 +526,7 @@ export const FinanceView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
+                <label className="block text-xs font-bold text-slate-600 mb-1">
                   ملاحظات أو تفاصيل الدفعة (اختياري)
                 </label>
                 <textarea
@@ -380,7 +534,7 @@ export const FinanceView: React.FC = () => {
                   placeholder="أي تفاصيل أو رقم إيصال تحويل..."
                   value={depositNotes}
                   onChange={(e) => setDepositNotes(e.target.value)}
-                  className="w-full bg-navy-950 border border-surface-border rounded-xl px-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan"
+                  className="w-full bg-navy-950 border border-surface-border rounded-xl px-4 py-2 text-xs text-slate-900 placeholder-slate-500 focus:outline-none focus:border-cyan"
                 ></textarea>
               </div>
 
@@ -388,7 +542,7 @@ export const FinanceView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsDepositModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white"
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-900"
                 >
                   إلغاء
                 </button>
@@ -406,16 +560,16 @@ export const FinanceView: React.FC = () => {
 
       {/* MODAL: Register New Expense */}
       {isExpenseModalOpen && (
-        <div className="fixed inset-0 z-50 bg-navy-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="glass-panel rounded-3xl p-6 w-full max-w-lg border border-rose-500/40 shadow-glow-card animate-fadeIn">
+        <div className="fixed inset-0 z-50 bg-[#0B2447]/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="glass-panel rounded-3xl p-6 w-full max-w-lg border border-rose-500/40 shadow-glow-card animate-scaleIn">
             <div className="flex items-center justify-between pb-4 border-b border-surface-border">
               <div className="flex items-center gap-2">
                 <Receipt className="w-5 h-5 text-rose-400" />
-                <h3 className="text-base font-bold text-white">تسجيل مصروف جديد للاعتماد</h3>
+                <h3 className="text-base font-bold text-slate-900">تسجيل مصروف جديد للاعتماد</h3>
               </div>
               <button
                 onClick={() => setIsExpenseModalOpen(false)}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-500 hover:text-slate-900"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -423,7 +577,7 @@ export const FinanceView: React.FC = () => {
 
             <form onSubmit={handleExpenseSubmit} className="space-y-4 mt-5">
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
+                <label className="block text-xs font-bold text-slate-600 mb-1">
                   عنوان المصروف / البيان *
                 </label>
                 <input
@@ -432,12 +586,12 @@ export const FinanceView: React.FC = () => {
                   placeholder="مثال: شراء تراخيص برمجيات / صيانة خوادم..."
                   value={expenseTitle}
                   onChange={(e) => setExpenseTitle(e.target.value)}
-                  className="w-full bg-navy-950 border border-surface-border rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-400"
+                  className="w-full bg-navy-950 border border-surface-border rounded-xl px-4 py-2.5 text-xs text-slate-900 placeholder-slate-500 focus:outline-none focus:border-rose-400"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
+                <label className="block text-xs font-bold text-slate-600 mb-1">
                   المبلغ (بالجنيه المصري) *
                 </label>
                 <input
@@ -448,29 +602,53 @@ export const FinanceView: React.FC = () => {
                   placeholder="مثال: 45000"
                   value={expenseAmount}
                   onChange={(e) => setExpenseAmount(e.target.value)}
-                  className="w-full bg-navy-950 border border-surface-border rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-400 font-mono"
+                  className="w-full bg-navy-950 border border-surface-border rounded-xl px-4 py-2.5 text-xs text-slate-900 placeholder-slate-500 focus:outline-none focus:border-rose-400 font-mono"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
+                <label className="block text-xs font-bold text-slate-600 mb-1">
                   التصنيف المحاسبي *
                 </label>
                 <select
                   value={expenseCategory}
                   onChange={(e) => setExpenseCategory(e.target.value)}
-                  className="w-full bg-navy-950 border border-surface-border rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-rose-400"
+                  className="w-full bg-navy-950 border border-surface-border rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-rose-400"
                 >
-                  <option value="سيرفرات وبنية تحتية">سيرفرات وبنية تحتية</option>
-                  <option value="مرتبات ومكافآت هندسية">مرتبات ومكافآت هندسية</option>
-                  <option value="تشغيل ومقر الشركة">تشغيل ومقر الشركة</option>
-                  <option value="تسويق وإعلانات">تسويق وإعلانات</option>
-                  <option value="قانوني وتراخيص">قانوني وتراخيص</option>
+                  {isFixedExpense ? (
+                    <option value="مصاريف ثابتة">مصاريف ثابتة (تتكرر شهرياً)</option>
+                  ) : (
+                    <>
+                      <option value="سيرفرات وبنية تحتية">سيرفرات وبنية تحتية</option>
+                      <option value="مرتبات ومكافآت هندسية">مرتبات ومكافآت هندسية</option>
+                      <option value="تشغيل ومقر الشركة">تشغيل ومقر الشركة</option>
+                      <option value="تسويق وإعلانات">تسويق وإعلانات</option>
+                      <option value="قانوني وتراخيص">قانوني وتراخيص</option>
+                    </>
+                  )}
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
+                <label className="block text-xs font-bold text-slate-600 mb-1">
+                  المصروف ده على أنهي مشروع / شركة عميل؟ (اختياري)
+                </label>
+                <select
+                  value={expenseProject}
+                  onChange={(e) => setExpenseProject(e.target.value)}
+                  className="w-full bg-navy-950 border border-surface-border rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-rose-400"
+                >
+                  <option value="">— مصروف عام على الشركة (مش مرتبط بمشروع) —</option>
+                  {projects.map((prj) => (
+                    <option key={prj.id} value={prj.id}>
+                      {prj.name} ({prj.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">
                   الوصف وسبب الصرف *
                 </label>
                 <textarea
@@ -479,28 +657,39 @@ export const FinanceView: React.FC = () => {
                   placeholder="تفاصيل الاحتياج والمستفيد..."
                   value={expenseDesc}
                   onChange={(e) => setExpenseDesc(e.target.value)}
-                  className="w-full bg-navy-950 border border-surface-border rounded-xl px-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-400"
+                  className="w-full bg-navy-950 border border-surface-border rounded-xl px-4 py-2 text-xs text-slate-900 placeholder-slate-500 focus:outline-none focus:border-rose-400"
                 ></textarea>
               </div>
 
-              <div className="p-3 rounded-xl bg-navy-950 border border-surface-border text-[11px] text-slate-400 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-cyan shrink-0" />
-                <span>سيتم إحالة المصروف مباشرة لصفحة اعتمادات الشركاء للتصويت عليه.</span>
+              <div className="p-3 rounded-xl bg-navy-950 border border-surface-border text-[11px] text-slate-500 flex items-center gap-2">
+                <AlertCircle className={`w-4 h-4 shrink-0 ${isFixedExpense ? 'text-amber-500' : 'text-cyan'}`} />
+                <span>
+                  {isFixedExpense
+                    ? 'المصروف الثابت بيتخصم من الرصيد في نفس يوم اعتماده — واعتماده إلزامي بموافقة 4 من 4 شركاء.'
+                    : 'سيتم إحالة المصروف مباشرة لصفحة اعتمادات الشركاء للتصويت عليه.'}
+                </span>
               </div>
 
               <div className="pt-3 border-t border-surface-border flex items-center justify-end gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsExpenseModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white"
+                  onClick={() => {
+                    setIsExpenseModalOpen(false);
+                    setIsFixedExpense(false);
+                  }}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-900"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
-                  className="bg-rose-500 hover:bg-rose-600 text-white px-6 py-2.5 rounded-xl text-xs font-black transition"
+                  className={`px-6 py-2.5 rounded-xl text-xs font-black transition text-white ${
+                    isFixedExpense
+                      ? 'bg-gradient-to-r from-cyan to-electric-500 hover:from-cyan-hover hover:to-electric-500'
+                      : 'bg-rose-500 hover:bg-rose-600'
+                  }`}
                 >
-                  إرسال المصروف للاعتماد
+                  {isFixedExpense ? 'إضافة المصروف الثابت للاعتماد' : 'إرسال المصروف للاعتماد'}
                 </button>
               </div>
             </form>

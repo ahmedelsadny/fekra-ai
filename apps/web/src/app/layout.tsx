@@ -3,6 +3,7 @@ import './globals.css';
 import { LanguageProvider } from '../context/LanguageContext';
 import { AuthProvider } from '../context/AuthContext';
 import { FinanceProvider } from '../context/FinanceContext';
+import { ProjectProvider } from '../context/ProjectContext';
 
 export const metadata: Metadata = {
   title: 'FEKRA AI – Company Operating System',
@@ -16,11 +17,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ar" dir="rtl" className="dark">
-      <body className="bg-navy-950 text-slate-100 antialiased min-h-screen selection:bg-cyan selection:text-navy-950">
+      <body className="bg-navy-950 text-slate-800 antialiased min-h-screen selection:bg-cyan selection:text-white">
         <LanguageProvider>
           <AuthProvider>
             <FinanceProvider>
-              {children}
+              <ProjectProvider>
+                {children}
+              </ProjectProvider>
             </FinanceProvider>
           </AuthProvider>
         </LanguageProvider>
