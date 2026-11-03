@@ -5,6 +5,9 @@
 # ============================================================
 FROM node:20-bookworm-slim
 
+# Install OpenSSL required by Prisma engine on Debian slim
+RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Copy workspace manifests first (better layer caching)
