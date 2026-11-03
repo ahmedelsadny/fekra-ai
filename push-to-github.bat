@@ -13,7 +13,7 @@ git add .
 
 echo.
 echo [2/4] إنشاء Commit...
-git commit -m "Add self-hosted WebRTC video calling, Nginx HTTPS reverse proxy, and SSL setup"
+git commit -m "Fix user.name property in MeetingsView"
 
 echo.
 echo [3/4] التأكد من الفرع الرئيسي main...

@@ -455,7 +455,7 @@ export const MeetingsView: React.FC = () => {
           roomSlug={callRoom.slug}
           roomTitle={callRoom.title}
           roomType={callRoom.type}
-          currentUserName={user?.fullName || 'أنت'}
+          currentUserName={user?.name || 'أنت'}
           onClose={() => setCallRoom(null)}
         />
       )}
